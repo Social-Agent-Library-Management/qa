@@ -31,7 +31,9 @@ def is_alive(pid: int) -> bool:
         os.kill(pid, 0)
     except OSError:
         return False
-    return True
+    # 다른 프로세스(예: 워커)가 띄운 자식은 종료 후 좀비로 남아 kill(0)이 성공한다 — 좀비는 죽은 것으로 본다.
+    stat = subprocess.run(["ps", "-o", "stat=", "-p", str(pid)], capture_output=True, text=True).stdout.strip()
+    return bool(stat) and not stat.startswith("Z")
 
 
 def spawn(name: str, cmd: list[str], cwd: Path, env: dict[str, str]) -> int:
@@ -48,12 +50,22 @@ def stop(pid: int) -> None:
     if not is_alive(pid):
         return
     # 세션 리더로 띄웠으므로 그룹 전체(npm → node 자식 포함)를 내린다.
-    os.killpg(pid, signal.SIGTERM)
+    _killpg(pid, signal.SIGTERM)
     for _ in range(50):
         if not is_alive(pid):
-            return
+            break
         time.sleep(0.2)
-    os.killpg(pid, signal.SIGKILL)
+    else:
+        _killpg(pid, signal.SIGKILL)
+    # 리더가 먼저 끝나도 그룹에 남은 자식(next-server 등)이 포트를 잡고 있을 수 있다.
+    _killpg(pid, signal.SIGKILL)
+
+
+def _killpg(pgid: int, sig: int) -> None:
+    try:
+        os.killpg(pgid, sig)
+    except (ProcessLookupError, PermissionError):
+        pass  # 그룹이 이미 비었거나 좀비 리더만 남음
 
 
 def wait_http(name: str, url: str, pid: int, timeout: float) -> None:
