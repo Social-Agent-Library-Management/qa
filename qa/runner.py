@@ -62,7 +62,8 @@ def run(names: list[str], front_ref: str = "HEAD", back_ref: str = "HEAD", job_i
         "--base-url", settings.frontend_url,
         "--browser", "chromium",
         "--tracing", "retain-on-failure",
-        "--screenshot", "only-on-failure",
+        # 통과도 근거가 남도록 테스트마다 마지막 화면을 캡처한다 (실패 시 trace는 따로 남김).
+        "--screenshot", "on",
         "--output", str(run_dir / "playwright"),
         "--junitxml", str(junit),
         "-p", "no:cacheprovider",

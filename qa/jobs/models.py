@@ -8,17 +8,27 @@ class JobRequest(BaseModel):
 
     source: Literal["slack", "github_pr", "api"] = "api"
     request: str = Field(default="", description="원문 요청(자연어). 실패 분석·리포트에 그대로 남긴다.")
-    front_ref: str = "HEAD"
-    back_ref: str = "HEAD"
-    scenarios: list[str] | None = Field(default=None, description="생략 시 전체 (3단계부터 자연어로 결정)")
+    front_ref: str | None = Field(default=None, description="생략 시 자연어에서 추출, 그것도 없으면 HEAD")
+    back_ref: str | None = None
+    scenarios: list[str] | None = Field(default=None, description="생략 시 자연어로 결정")
     reply_to: dict | None = Field(default=None, description="결과를 돌려보낼 곳. 엔진은 해석하지 않고 콜백에 그대로 싣는다.")
 
 
 class JobAccepted(BaseModel):
+    accepted: bool = True
     job_id: str
+    mode: Literal["scenario", "explore"]
+    scenarios: list[str]
+    reason: str | None
     position: int
     front_sha: str
     back_sha: str
+    message: str = Field(description="요청자에게 그대로 보여줄 접수 안내")
+
+
+class JobRejected(BaseModel):
+    accepted: bool = False
+    message: str
 
 
 class JobStatus(BaseModel):
@@ -26,6 +36,7 @@ class JobStatus(BaseModel):
     status: str
     position: int | None
     request: JobRequest
+    mode: str
     front_sha: str
     back_sha: str
     enqueued_at: str | None
