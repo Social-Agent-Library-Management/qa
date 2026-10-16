@@ -22,8 +22,26 @@ def main() -> None:
     run.add_argument("--front-ref", default="HEAD")
     run.add_argument("--back-ref", default="HEAD")
 
+    sub.add_parser("api", help="작업 접수 API 서버")
+    sub.add_parser("worker", help="작업 실행 워커 (하나만 띄운다)")
+
     args = parser.parse_args()
-    if args.cmd == "stack":
+    if args.cmd == "api":
+        import uvicorn
+
+        from qa.config import settings
+        uvicorn.run("qa.api.app:app", host="0.0.0.0", port=settings.api_port)
+    elif args.cmd == "worker":
+        import logging
+
+        from rq import SimpleWorker
+
+        from qa.jobs.queue import queue, redis
+        logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(name)s: %(message)s")
+        # fork 없이 같은 프로세스에서 실행한다 — macOS의 fork 안전성 문제를 피하고,
+        # 실제 무거운 일(빌드·브라우저)은 어차피 하위 프로세스가 한다.
+        SimpleWorker([queue()], connection=redis()).work()
+    elif args.cmd == "stack":
         if args.action == "up":
             print(json.dumps(apps.up(args.front_ref, args.back_ref), indent=2))
         else:

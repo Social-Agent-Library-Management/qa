@@ -46,7 +46,7 @@ def _parse_junit(path: Path, run_dir: Path) -> list[dict]:
     return tests
 
 
-def run(names: list[str], front_ref: str = "HEAD", back_ref: str = "HEAD") -> dict:
+def run(names: list[str], front_ref: str = "HEAD", back_ref: str = "HEAD", job_id: str | None = None) -> dict:
     run_id = datetime.now().strftime("%Y%m%d-%H%M%S")
     run_dir = settings.artifacts_dir / run_id
     run_dir.mkdir(parents=True)
@@ -72,6 +72,7 @@ def run(names: list[str], front_ref: str = "HEAD", back_ref: str = "HEAD") -> di
     tests = _parse_junit(junit, run_dir) if junit.exists() else []
     summary = {
         "run_id": run_id,
+        "job_id": job_id,
         "scenarios": names or ["all"],
         **shas,
         "started_at": started,

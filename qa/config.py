@@ -19,9 +19,14 @@ class Settings(BaseSettings):
     mysql_password: str = "qa"
     mysql_db: str = "library_qa"
     opensearch_port: int = 9201
+    redis_url: str = "redis://localhost:6380/0"
 
     backend_port: int = 8081
     frontend_port: int = 3001
+    api_port: int = 8090
+
+    # 작업 완료 결과를 받을 곳(n8n 출구 웹훅). 비어 있으면 로그만 남긴다.
+    callback_url: str | None = None
 
     work_dir: Path = ROOT / ".work"
     artifacts_dir: Path = ROOT / "artifacts"
