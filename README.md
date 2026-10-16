@@ -47,6 +47,24 @@ curl localhost:8090/jobs/<job_id>   # status · enqueued/started/ended_at · res
 - 완료 시 `QA_CALLBACK_URL`(n8n 출구 웹훅)로 `{job_id, request, reply_to, summary | error}`를 보낸다.
   `reply_to`는 엔진이 해석하지 않고 그대로 싣는다 — 채널 지식은 입구·출구(n8n)에만 있다.
 
+## Slack 연동 (n8n + ngrok)
+```
+#qa에서 @Library QA <자연어 요청>
+  → ngrok(공개 주소, Slack 입구 경로만 허용) → n8n「QA · Slack 입구」→ POST /jobs → 접수 안내 답글
+  → 워커 실행 → QA_CALLBACK_URL → n8n「QA · 결과 출구」→ 결과 답글 + 스크린샷 첨부
+```
+- **요청 해석**: 맞는 시나리오가 있으면 시나리오 테스트, 없으면 AI 탐색 테스트로 실행한다.
+- **n8n에는 로직을 두지 않는다.** 메시지 문구(`report.text`)와 첨부 목록은 QA 서비스가 만들고 n8n은 전달만 한다.
+- **공개 범위**: `ngrok/policy.yml`이 Slack 입구 웹훅 경로만 통과시킨다. n8n 편집 화면·출구 웹훅은 로컬 전용.
+  입구는 Slack Signing Secret으로 서명을 검증해 위조 요청을 401로 거부한다.
+
+처음 설정:
+1. `docker compose -f compose.qa.yml up -d n8n ngrok` → http://localhost:5678 에서 관리자 계정 생성
+2. Credentials → Slack API 자격증명 `Slack · Library QA` (Bot token + Signing Secret)
+3. `./n8n/import.sh` — 워크플로 등록·게시 (자격증명 ID는 이름으로 찾아 치환)
+4. Slack 앱 Event Subscriptions Request URL:
+   `https://<QA_PUBLIC_DOMAIN>/webhook/074f0964-db8e-4290-9a75-e558650b96f1/webhook`, bot event `app_mention`
+
 ## 시드
 매 테스트 전 `qa/seed/reset.py`가 테이블을 TRUNCATE하고 `books` 인덱스를 재생성한 뒤
 `qa/seed/fixtures.yaml`을 **백엔드 REST API로** 적재한다. 날짜는 실행일 기준 오프셋이라 연체 시드가 날짜와 무관하게 유지된다.

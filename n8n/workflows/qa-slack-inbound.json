@@ -1,0 +1,64 @@
+{
+  "id": "qaSlackInbound01",
+  "name": "QA · Slack 입구",
+  "active": false,
+  "settings": { "executionOrder": "v1" },
+  "nodes": [
+    {
+      "id": "a1f0c2d4-0001-4000-8000-000000000001",
+      "name": "Slack 멘션",
+      "type": "n8n-nodes-base.slackTrigger",
+      "typeVersion": 1,
+      "position": [0, 0],
+      "webhookId": "074f0964-db8e-4290-9a75-e558650b96f1",
+      "parameters": {
+        "trigger": ["app_mention"],
+        "watchWorkspace": true,
+        "options": {}
+      },
+      "credentials": { "slackApi": { "id": "SLACK_CREDENTIAL_ID", "name": "Slack · Library QA" } }
+    },
+    {
+      "id": "a1f0c2d4-0002-4000-8000-000000000002",
+      "name": "QA 작업 접수",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [260, 0],
+      "parameters": {
+        "method": "POST",
+        "url": "http://host.docker.internal:8090/jobs",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ source: 'slack', request: $json.text.replace(/<@[^>]+>/g, '').trim(), reply_to: { channel: $json.channel, thread_ts: $json.thread_ts || $json.ts } }) }}",
+        "options": {
+          "timeout": 60000,
+          "response": { "response": { "neverError": true } }
+        }
+      }
+    },
+    {
+      "id": "a1f0c2d4-0003-4000-8000-000000000003",
+      "name": "접수 안내 답글",
+      "type": "n8n-nodes-base.slack",
+      "typeVersion": 2.3,
+      "position": [520, 0],
+      "parameters": {
+        "resource": "message",
+        "operation": "post",
+        "select": "channel",
+        "channelId": { "__rl": true, "mode": "id", "value": "={{ $('Slack 멘션').item.json.channel }}" },
+        "messageType": "text",
+        "text": "={{ $json.message || ('⚠️ 접수 실패: ' + JSON.stringify($json)) }}",
+        "otherOptions": {
+          "includeLinkToWorkflow": false,
+          "thread_ts": { "replyValues": { "thread_ts": "={{ $('Slack 멘션').item.json.thread_ts || $('Slack 멘션').item.json.ts }}" } }
+        }
+      },
+      "credentials": { "slackApi": { "id": "SLACK_CREDENTIAL_ID", "name": "Slack · Library QA" } }
+    }
+  ],
+  "connections": {
+    "Slack 멘션": { "main": [[{ "node": "QA 작업 접수", "type": "main", "index": 0 }]] },
+    "QA 작업 접수": { "main": [[{ "node": "접수 안내 답글", "type": "main", "index": 0 }]] }
+  }
+}
