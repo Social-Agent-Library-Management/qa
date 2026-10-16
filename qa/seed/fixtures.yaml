@@ -1,0 +1,27 @@
+# 모든 시나리오가 공유하는 기준 데이터. 매 테스트 전 DB를 비우고 이 상태로 되돌린다.
+# 날짜는 실행일 기준 오프셋 — 서버가 LocalDate.now()로 연체를 계산하므로 고정 날짜를 쓰면 언젠가 깨진다.
+books:
+  - title: 데미안
+    author: 헤르만 헤세
+    publisher: 민음사
+    items: [문학-0001]
+  - title: 어린 왕자
+    author: 앙투안 드 생텍쥐페리
+    publisher: 열린책들
+    items: [문학-0002]
+  - title: 클린 코드
+    author: 로버트 C. 마틴
+    publisher: 인사이트
+    items: [IT-0001]
+
+loans:
+  # 반납 예정일 전 — 대출중
+  - management_number: 문학-0002
+    borrower_name: 김대출
+    department: 행정지원팀
+    loan_date_offset_days: -3
+  # 반납 예정일(+14일) 경과 — 연체
+  - management_number: IT-0001
+    borrower_name: 이연체
+    department: 교육팀
+    loan_date_offset_days: -20
