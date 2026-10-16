@@ -56,5 +56,39 @@ services:
       timeout: 5s
       retries: 40
 
+  # 통합 계층: Slack 입구·출구만 담당하고 검증 로직은 두지 않는다.
+  n8n:
+    image: docker.n8n.io/n8nio/n8n:2.43.6
+    ports:
+      - "5678:5678"
+    environment:
+      - GENERIC_TIMEZONE=Asia/Seoul
+      - TZ=Asia/Seoul
+      - WEBHOOK_URL=https://${QA_PUBLIC_DOMAIN}/
+      - N8N_DIAGNOSTICS_ENABLED=false
+      - N8N_PERSONALIZATION_ENABLED=false
+    volumes:
+      - n8n-data:/home/node/.n8n
+      - ./n8n/workflows:/workflows:ro
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+
+  # Slack이 이벤트를 보낼 공개 주소. 트래픽 정책으로 Slack 입구 웹훅 경로만 열고
+  # n8n 편집 화면·출구 웹훅은 외부에 노출하지 않는다. authtoken은 호스트 ngrok 설정을 그대로 읽는다.
+  ngrok:
+    image: ngrok/ngrok:3.39.8-alpine
+    command:
+      - http
+      - --config=/etc/ngrok/auth.yml
+      - --url=${QA_PUBLIC_DOMAIN}
+      - --traffic-policy-file=/etc/ngrok/policy.yml
+      - n8n:5678
+    volumes:
+      - "${HOME}/Library/Application Support/ngrok/ngrok.yml:/etc/ngrok/auth.yml:ro"
+      - ./ngrok/policy.yml:/etc/ngrok/policy.yml:ro
+    depends_on:
+      - n8n
+
 volumes:
   redis-data:
+  n8n-data:
