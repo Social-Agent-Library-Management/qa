@@ -1,5 +1,6 @@
 from pathlib import Path
 
+from pydantic import Field
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 ROOT = Path(__file__).resolve().parent.parent
@@ -27,6 +28,11 @@ class Settings(BaseSettings):
 
     # 작업 완료 결과를 받을 곳(n8n 출구 웹훅). 비어 있으면 로그만 남긴다.
     callback_url: str | None = None
+    # n8n(컨테이너)이 산출물(스크린샷)을 내려받을 때 쓰는 이 API의 주소
+    api_url_for_n8n: str = "http://host.docker.internal:8090"
+
+    # Claude Code 헤드리스 호출용 구독 토큰 (`claude setup-token`)
+    claude_code_oauth_token: str | None = Field(default=None, validation_alias="CLAUDE_CODE_OAUTH_TOKEN")
 
     work_dir: Path = ROOT / ".work"
     artifacts_dir: Path = ROOT / "artifacts"

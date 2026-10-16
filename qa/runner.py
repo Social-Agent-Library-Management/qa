@@ -17,12 +17,14 @@ SCENARIO_DIR = ROOT / "scenarios"
 def scenario_paths(names: list[str]) -> list[str]:
     if not names or names == ["all"]:
         return [str(SCENARIO_DIR)]
+    # "loan_return" = 파일 전체, "loan_return::test_overdue_filter" = 테스트 하나
     paths = []
     for name in names:
-        path = SCENARIO_DIR / f"test_{name}.py"
-        if not path.exists():
-            raise FileNotFoundError(f"시나리오 없음: {name} ({path})")
-        paths.append(str(path))
+        module, _, func = name.partition("::")
+        path = SCENARIO_DIR / f"test_{module}.py"
+        if not path.exists() or (func and f"def {func}(" not in path.read_text()):
+            raise FileNotFoundError(f"시나리오 없음: {name}")
+        paths.append(f"{path}::{func}" if func else str(path))
     return paths
 
 
