@@ -27,6 +27,13 @@ def main() -> None:
     explore.add_argument("--front-ref", default="HEAD")
     explore.add_argument("--back-ref", default="HEAD")
 
+    rag = sub.add_parser("rag", help="vault 이력 수집·인덱스 동기화·검색")
+    rag.add_argument("action", choices=["history", "sync", "search"])
+    rag.add_argument("query", nargs="?")
+    rag.add_argument("--method", choices=["vector", "keyword", "agentic"], default="vector")
+    rag.add_argument("--source", choices=["기획서", "이력", "QA 리포트"])
+    rag.add_argument("-k", type=int, default=5)
+
     sub.add_parser("api", help="작업 접수 API 서버")
     sub.add_parser("worker", help="작업 실행 워커 (하나만 띄운다)")
 
@@ -46,6 +53,15 @@ def main() -> None:
         # fork 없이 같은 프로세스에서 실행한다 — macOS의 fork 안전성 문제를 피하고,
         # 실제 무거운 일(빌드·브라우저)은 어차피 하위 프로세스가 한다.
         SimpleWorker([queue()], connection=redis()).work()
+    elif args.cmd == "rag":
+        from qa.rag import history, index, search
+        if args.action == "history":
+            print(history.collect())
+        elif args.action == "sync":
+            print(index.sync())
+        else:
+            for h in search.unique_notes(search.METHODS[args.method](args.query, args.k * 3, args.source))[:args.k]:
+                print(f"{h.score:.3f}  {h.path}  ›  {h.heading}")
     elif args.cmd == "explore":
         from qa import explore as explore_mod
         summary = explore_mod.run(args.request, args.front_ref, args.back_ref)
