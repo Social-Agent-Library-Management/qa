@@ -1,0 +1,890 @@
+<!-- @dsCard group="Library Management" viewport="1440x900" name="Full System" subtitle="Interactive prototype · MVP scope · 9 screens" -->
+<!-- @startingPoint section="Library Management" subtitle="Library admin interface — MVP feature set (9 screens)" viewport="1440x900" -->
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>도서 관리 시스템</title>
+<link rel="stylesheet" href="../../styles.css">
+<script src="https://unpkg.com/react@18.3.1/umd/react.development.js" integrity="sha384-hD6/rw4ppMLGNu3tX5cjIb+uRZ7UkRJ6BPkLpg4hAu/6onKUg4lLsHAs9EBPT82L" crossorigin="anonymous"></script>
+<script src="https://unpkg.com/react-dom@18.3.1/umd/react-dom.development.js" integrity="sha384-u6aeetuaXnQ38mYT8rp6sbXaQe3NL9t+IBXmnYxwkUI2Hw4bsp2Wvmx4yRQF1uAm" crossorigin="anonymous"></script>
+<script src="https://unpkg.com/@babel/standalone@7.29.0/babel.min.js" integrity="sha384-m08KidiNqLdpJqLq95G/LEi8Qvjl/xUYll3QILypMoQ65QorJ9Lvtp2RXYGBFj1y" crossorigin="anonymous"></script>
+<script src="../../_ds_bundle.js"></script>
+<style>
+  *, *::before, *::after { box-sizing: border-box; }
+  html, body, #root { margin: 0; padding: 0; height: 100%; }
+  body { font-family: var(--font-family-base); background: var(--color-bg); }
+  @keyframes sugSlide { from { opacity: 0; transform: translateY(-100%); } to { opacity: 1; transform: translateY(0); } }
+</style>
+</head>
+<body>
+<div id="root"></div>
+<script type="text/babel">
+let Button, Badge, Input, Card, StatCard, DdayCard, DataTable, Sidebar;
+
+/* ── Sample Data ─────────────────────────────────────── */
+const TODAY = '2026-04-01';
+const LOANS = [
+  { copyNo:'사회-0031', title:'사회복지 조사방법론', borrower:'윤해진', dept:'기획팀',     date:'2026-03-11T10:40', due:'2026-03-25', returnedAt:'2026-04-01T14:05', status:'returned'},
+  { copyNo:'사회-0018', title:'사회복지 행정론',   borrower:'배준석', dept:'행정과',     date:'2026-04-01T13:15', due:'2026-04-15', returnedAt:null,              status:'loaned'  },
+  { copyNo:'아동-0011', title:'보육교사론',         borrower:'최은영', dept:'사회복지과', date:'2026-03-21T09:30', due:'2026-04-04', returnedAt:'2026-04-01T11:10', status:'returned'},
+  { copyNo:'노인-0008', title:'노인복지 실무론',   borrower:'임도연', dept:'기획팀',     date:'2026-03-31T16:45', due:'2026-04-14', returnedAt:null,              status:'loaned'  },
+  { copyNo:'사회-0001', title:'사회복지학 개론',     borrower:'박영희', dept:'사회복지과', date:'2026-03-20', due:'2026-04-03', returnedAt:null,         status:'loaned'  },
+  { copyNo:'사회-0014', title:'인간행동과 사회환경', borrower:'김철수', dept:'행정과',     date:'2026-03-19', due:'2026-04-02', returnedAt:null,         status:'loaned'  },
+  { copyNo:'사회-0007', title:'지역사회복지론',      borrower:'이수진', dept:'기획팀',     date:'2026-03-05', due:'2026-03-19', returnedAt:null,         status:'overdue' },
+  { copyNo:'사회-0022', title:'사회복지 실천기술론', borrower:'정민호', dept:'사회복지과', date:'2026-03-17', due:'2026-03-31', returnedAt:null,         status:'overdue' },
+  { copyNo:'사회-0009', title:'사회복지 정책론',     borrower:'강지원', dept:'행정과',     date:'2026-03-01', due:'2026-03-15', returnedAt:'2026-03-13', status:'returned'},
+  { copyNo:'아동-0003', title:'아동복지론',          borrower:'오세현', dept:'기획팀',     date:'2026-03-14', due:'2026-03-28', returnedAt:null,         status:'overdue' },
+  { copyNo:'노인-0005', title:'노인복지론',          borrower:'한미선', dept:'기획팀',     date:'2026-03-18', due:'2026-04-01', returnedAt:null,         status:'loaned'  },
+];
+const daysBetween = (a,b) => Math.round((new Date(b)-new Date(a))/86400000);
+/* Relative timestamps for the activity feed. Seed data carries date-only values, so NOW is derived from TODAY. */
+const NOW = new Date(TODAY + 'T14:20:00');
+function timeAgo(at) {
+  const t = at.length > 10 ? new Date(at) : new Date(at + 'T09:00:00');
+  const mins = Math.max(0, Math.round((NOW - t)/60000));
+  if (mins < 1)    return '방금 전';
+  if (mins < 60)   return `${mins}분 전`;
+  const hrs = Math.floor(mins/60);
+  if (hrs < 24)    return `${hrs}시간 전`;
+  const days = Math.floor(hrs/24);
+  if (days === 1)  return '어제';
+  if (days < 7)    return `${days}일 전`;
+  if (days < 28)   return `${Math.floor(days/7)}주 전`;
+  return at.slice(0,10);
+}
+/* GET /books/search returns suggestion:string|null — independent of result count (high precision: 0 false positives over 250 valid queries). Demo dictionary + bigram fallback stand in for the real search/correction API. */
+const SEARCH_TYPO_MAP = { '사회복찌학개론':'사회복지학 개론', '아동복찌론':'아동복지론', '노인복찌론':'노인복지론', '자원봉사롱':'자원봉사론', '가족복찌론':'가족복지론', '사회복지정착론':'사회복지 정새론', '지역사회복지룬':'지역사회복지론', '사회복지실천기숯론':'사회복지 실천기술론' };
+/* Loose fallback: when nothing matches exactly, rank books sharing 2-char sequences with the query — this is how a typo can still return many unrelated hits. */
+const bigrams = s => { const t=s.replace(/\s/g,''); return Array.from({length:Math.max(0,t.length-1)},(_,i)=>t.slice(i,i+2)); };
+const hasBatchim = ch => (ch.charCodeAt(0) - 0xAC00) % 28 !== 0;
+const withEul  = w => w + (hasBatchim(w[w.length-1]) ? '을' : '를');
+const withEuro = w => w + (hasBatchim(w[w.length-1]) ? '으로' : '로');
+const withEun  = w => w + (hasBatchim(w[w.length-1]) ? '은' : '는');
+const addDays = (d,n) => { const t=new Date(d); t.setDate(t.getDate()+n); return t.toISOString().slice(0,10); };
+const OVERDUE = LOANS.filter(r=>r.status==='overdue')
+  .map(r=>({...r, over: daysBetween(r.due, TODAY)}))
+  .sort((a,b)=>b.over-a.over);
+const BOOK_META = [
+  { title:'사회복지학 개론',     author:'이봉주', publisher:'나남출판', isbn:'978-89-300-4001-5' },
+  { title:'인간행동과 사회환경', author:'최옥채', publisher:'양서원',   isbn:'978-89-994-0831-2' },
+  { title:'지역사회복지론',      author:'감정기', publisher:'나남출판', isbn:'978-89-300-4012-1' },
+  { title:'사회복지 정책론',     author:'신동면', publisher:'정민사',   isbn:'978-89-5974-622-3' },
+  { title:'아동복지론',          author:'최경순', publisher:'양서원',   isbn:'978-89-994-0712-4' },
+  { title:'사회복지조사론',      author:'김기덕', publisher:'학지사',   isbn:'978-89-997-1120-8' },
+  { title:'사회복지 실천기술론', author:'김혜란', publisher:'나남출판', isbn:'978-89-300-4033-6' },
+  { title:'자원봉사론',          author:'류기형', publisher:'양서원',   isbn:'978-89-994-0655-4' },
+  { title:'노인복지론',          author:'권중돈', publisher:'학지사',   isbn:'978-89-997-1288-5' },
+  { title:'가족복지론',          author:'조흥식', publisher:'학지사',   isbn:'978-89-997-1402-1' },
+  { title:'사회복지행정론',      author:'황성철', publisher:'정민사',   isbn:'978-89-5974-731-2' },
+  { title:'사회복지법제론',      author:'윤찬영', publisher:'나남출판', isbn:'978-89-300-4055-8' },
+];
+const COPY_SEED = [
+  { copyNo:'사회-0001', title:'사회복지학 개론',     status:'loaned'    },
+  { copyNo:'사회-0002', title:'사회복지학 개론',     status:'available' },
+  { copyNo:'사회-0003', title:'사회복지학 개론',     status:'available' },
+  { copyNo:'사회-0007', title:'지역사회복지론',      status:'overdue'   },
+  { copyNo:'사회-0008', title:'지역사회복지론',      status:'available' },
+  { copyNo:'사회-0009', title:'사회복지 정책론',     status:'available' },
+  { copyNo:'사회-0010', title:'사회복지 정책론',     status:'available' },
+  { copyNo:'사회-0014', title:'인간행동과 사회환경', status:'loaned'    },
+  { copyNo:'사회-0015', title:'인간행동과 사회환경', status:'available' },
+  { copyNo:'사회-0018', title:'사회복지조사론',      status:'available' },
+  { copyNo:'사회-0022', title:'사회복지 실천기술론', status:'overdue'   },
+  { copyNo:'사회-0023', title:'사회복지 실천기술론', status:'available' },
+  { copyNo:'사회-0031', title:'자원봉사론',          status:'available' },
+  { copyNo:'아동-0003', title:'아동복지론',          status:'overdue'   },
+  { copyNo:'아동-0004', title:'아동복지론',          status:'available' },
+  { copyNo:'아동-0005', title:'아동복지론',          status:'disposed'  },
+  { copyNo:'아동-0009', title:'아동복지론',          status:'lost'      },
+  { copyNo:'노인-0005', title:'노인복지론',          status:'loaned'    },
+  { copyNo:'노인-0006', title:'노인복지론',          status:'available' },
+  { copyNo:'노인-0007', title:'노인복지론',          status:'available' },
+  { copyNo:'가족-0001', title:'가족복지론',          status:'available' },
+  { copyNo:'가족-0002', title:'가족복지론',          status:'available' },
+  { copyNo:'가족-0003', title:'가족복지론',          status:'loaned'    },
+  { copyNo:'행정-0001', title:'사회복지행정론',      status:'available' },
+  { copyNo:'행정-0002', title:'사회복지행정론',      status:'available' },
+  { copyNo:'행정-0003', title:'사회복지행정론',      status:'loaned'    },
+  { copyNo:'법제-0001', title:'사회복지법제론',      status:'available' },
+  { copyNo:'법제-0002', title:'사회복지법제론',      status:'available' },
+];
+const COPIES = COPY_SEED;
+const copiesOf = title => COPY_SEED.filter(c=>c.title===title);
+const BOOKS = BOOK_META.map(b=>({...b, copies: copiesOf(b.title).length}));
+
+/* ── Icons ───────────────────────────────────────────── */
+const BookSvg  = ({c='var(--color-primary)'})  => <svg width="24" height="24" viewBox="0 0 24 24" fill="none"><path d="M4 3h14v18H4z" stroke={c} strokeWidth="1.5" strokeLinejoin="round"/><path d="M12 3v18" stroke={c} strokeWidth="1.5"/></svg>;
+const CopySvg  = ({c='var(--color-copy)'})     => <svg width="24" height="24" viewBox="0 0 24 24" fill="none"><rect x="3" y="6" width="14" height="16" rx="2" stroke={c} strokeWidth="1.5"/><path d="M7 3h14a2 2 0 0 1 2 2v16" stroke={c} strokeWidth="1.5" strokeLinecap="round"/></svg>;
+const LoanSvg  = ({c='var(--color-success)'})  => <svg width="24" height="24" viewBox="0 0 24 24" fill="none"><path d="M12 5v14M12 5l-4 4M12 5l4 4" stroke={c} strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/></svg>;
+const AlertSvg = ({c='var(--color-danger)'})   => <svg width="24" height="24" viewBox="0 0 24 24" fill="none"><circle cx="12" cy="12" r="9" stroke={c} strokeWidth="1.5"/><path d="M12 7v6M12 16v1" stroke={c} strokeWidth="2" strokeLinecap="round"/></svg>;
+const SearchSvg = () => <svg width="16" height="16" viewBox="0 0 16 16" fill="none" style={{position:'absolute',left:12,top:12,pointerEvents:'none'}}><circle cx="7" cy="7" r="5" stroke="var(--color-text-secondary)" strokeWidth="1.5"/><path d="M11.5 11.5L14 14" stroke="var(--color-text-secondary)" strokeWidth="1.5" strokeLinecap="round"/></svg>;
+
+/* ── Shared UI ───────────────────────────────────────── */
+function PageHeader({ title, sub, right }) {
+  return (
+    <div style={{display:'flex',alignItems:'flex-start',justifyContent:'space-between',marginBottom:24}}>
+      <div>
+        <div style={{fontSize:28,fontWeight:700,color:'var(--color-text-primary)',letterSpacing:'-0.03em',lineHeight:1.2}}>{title}</div>
+        {sub && <div style={{fontSize:13,color:'var(--color-text-secondary)',marginTop:4}}>{sub}</div>}
+      </div>
+      {right}
+    </div>
+  );
+}
+function Grid2({ children }) {
+  return <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:'16px 24px'}}>{children}</div>;
+}
+function SearchInput({ value, onChange, placeholder='검색' }) {
+  return (
+    <div style={{position:'relative',flex:1}}>
+      <SearchSvg />
+      <input value={value} onChange={onChange} placeholder={placeholder}
+        style={{width:'100%',height:40,paddingLeft:36,paddingRight:14,fontSize:14,fontFamily:'var(--font-family-base)',
+          border:'1px solid var(--color-border)',borderRadius:8,background:'var(--color-bg)',outline:'none',
+          color:'var(--color-text-primary)',boxSizing:'border-box'}} />
+    </div>
+  );
+}
+function StatusSelect({ value, onChange }) {
+  return (
+    <select value={value} onChange={onChange}
+      style={{height:40,padding:'0 12px',fontSize:13,fontFamily:'var(--font-family-base)',
+        border:'1px solid var(--color-border)',borderRadius:8,background:'var(--color-surface)',
+        color:'var(--color-text-primary)',outline:'none',cursor:'pointer'}}>
+      <option value="">전체 상태</option>
+      <option value="loaned">대출중</option>
+      <option value="overdue">연체</option>
+      <option value="returned">반납완료</option>
+    </select>
+  );
+}
+function Toast({ msg, onClose }) {
+  React.useEffect(() => { const t = setTimeout(onClose, 2800); return ()=>clearTimeout(t); }, [msg]);
+  return (
+    <div style={{position:'fixed',bottom:28,left:'50%',transform:'translateX(-50%)',
+      background:'var(--color-text-primary)',color:'#fff',padding:'11px 18px',
+      borderRadius:8,fontSize:14,fontFamily:'var(--font-family-base)',fontWeight:500,
+      zIndex:9999,boxShadow:'var(--shadow-md)',display:'flex',alignItems:'center',gap:8,letterSpacing:'-0.01em'}}>
+      <svg width="16" height="16" viewBox="0 0 16 16" fill="none"><circle cx="8" cy="8" r="6" fill="var(--color-success)"/><path d="M5 8l2 2 4-4" stroke="#fff" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/></svg>
+      {msg}
+    </div>
+  );
+}
+function CountBadge({ n, color='var(--color-primary)', bg='var(--color-primary-light)' }) {
+  return <span style={{fontSize:12,fontWeight:600,color,background:bg,padding:'3px 10px',borderRadius:9999}}>{n}</span>;
+}
+/* ── Screens ─────────────────────────────────────────── */
+function LoginScreen({ onLogin }) {
+  const [userId, setUserId] = React.useState('');
+  const [pw, setPw] = React.useState('');
+  return (
+    <div style={{minHeight:'100vh',display:'flex',alignItems:'center',justifyContent:'center',background:'var(--color-bg)'}}>
+      <div style={{width:420,background:'var(--color-surface)',borderRadius:16,padding:'48px 40px 40px',boxShadow:'var(--shadow-login)'}}>
+        <div style={{display:'flex',flexDirection:'column',alignItems:'center',marginBottom:32}}>
+          <div style={{width:64,height:64,borderRadius:14,background:'var(--color-primary)',display:'flex',alignItems:'center',justifyContent:'center',marginBottom:16}}>
+            <svg width="36" height="36" viewBox="0 0 36 36" fill="none"><path d="M6 9h24M6 15h24M6 21h17M6 27h24" stroke="white" strokeWidth="2.5" strokeLinecap="round"/></svg>
+          </div>
+          <div style={{fontSize:24,fontWeight:700,color:'var(--color-text-primary)',letterSpacing:'-0.03em',marginBottom:4}}>도서 관리 시스템</div>
+          <div style={{fontSize:13,color:'var(--color-text-secondary)'}}>사회복무요원 전용 관리 시스템</div>
+        </div>
+        <form onSubmit={e=>{e.preventDefault();onLogin();}} style={{display:'flex',flexDirection:'column',gap:14}}>
+          <Input label="아이디" placeholder="아이디를 입력하세요" value={userId} onChange={e=>setUserId(e.target.value)} />
+          <Input label="비밀번호" type="password" placeholder="비밀번호를 입력하세요" value={pw} onChange={e=>setPw(e.target.value)} />
+          <div style={{display:'flex',alignItems:'center',gap:8}}>
+            <input type="checkbox" id="rem" style={{width:15,height:15,accentColor:'var(--color-primary)'}}/>
+            <label htmlFor="rem" style={{fontSize:13,color:'var(--color-text-secondary)',cursor:'pointer'}}>로그인 상태 유지</label>
+          </div>
+          <Button type="submit" variant="primary" size="lg" fullWidth>로그인</Button>
+        </form>
+        <div style={{textAlign:'center',marginTop:24,fontSize:12,color:'var(--color-text-placeholder)'}}>v1.0 | 문의: admin@library.go.kr</div>
+      </div>
+    </div>
+  );
+}
+
+function DashboardScreen() {
+  const cols = [
+    {key:'title',label:'도서명',width:'30%'},{key:'borrower',label:'대출자',width:'12%'},
+    {key:'dept',label:'부서',width:'16%',secondary:true},
+    {key:'status',label:'활동',width:'14%'},{key:'_at',label:'',width:'14%',secondary:true,nowrap:true},
+  ];
+  /* An activity is the latest event on a loan: the return if it happened, otherwise the checkout. */
+  const activity = LOANS.map(r=>({...r, _at: r.status==='returned' ? r.returnedAt : r.date, _kind: r.status==='returned' ? 'returned' : 'loaned'}))
+    .sort((a,b)=> a._at < b._at ? 1 : a._at > b._at ? -1 : 0);
+  return (
+    <div style={{padding:'32px 40px'}}>
+      <PageHeader title="대시보드" sub="도서 관리 현황을 한눈에 확인하세요" />
+      <div style={{display:'grid',gridTemplateColumns:'repeat(auto-fit, minmax(220px, 1fr))',gap:20,marginBottom:24}}>
+        <StatCard label="전체 도서"   value={String(BOOKS.length)}  sub="등록된 서지 정보"                                  iconBg="var(--color-primary-light)"  icon={<BookSvg />} />
+        <StatCard label="전체 소장본" value={String(COPIES.length)} sub={`대출 가능 ${COPIES.filter(c=>c.status==='available').length}권`} subColor="var(--color-success)" iconBg="var(--color-copy-light)" icon={<CopySvg />} />
+        <StatCard label="현재 대출"   value={String(LOANS.filter(r=>r.status!=='returned').length)} sub="활성 대출 건수"     iconBg="var(--color-success-light)" icon={<LoanSvg />} />
+        <StatCard label="연체 항목"   value={String(OVERDUE.length)} sub="즉시 확인 필요" subColor="var(--color-danger)"  iconBg="var(--color-danger-light)"  icon={<AlertSvg />} />
+      </div>
+      <div style={{display:'flex',flexWrap:'wrap',gap:20,marginBottom:20}}>
+        <Card title="최근 활동" noPadding style={{flex:'2 1 480px',minWidth:0}}>
+          <DataTable columns={cols} rows={activity} renderCell={(col,v,row)=>{
+            if(col.key==='status') return row._kind==='returned'
+              ? <Badge status="returned" label="반납" />
+              : <Badge status={row.status} />;
+            if(col.key==='_at') return <span title={row._at} style={{fontSize:13,color:'var(--color-text-secondary)',whiteSpace:'nowrap'}}>{timeAgo(row._at)}</span>;
+            if(col.key==='borrower' && row.status==='returned') return <span style={{fontSize:13,color:'var(--color-text-placeholder)'}}>-</span>;
+            return v;
+          }} />
+        </Card>
+        <Card title="연체 목록" titleRight={<span style={{background:'var(--color-danger)',color:'#fff',fontSize:12,fontWeight:600,padding:'2px 8px',borderRadius:9999}}>{OVERDUE.length}</span>} style={{flex:'1 1 360px',minWidth:0}}>
+          <div style={{display:'flex',flexDirection:'column',gap:8}}>
+            {OVERDUE.map((d,i)=><DdayCard key={i} title={d.title} meta={`${d.borrower} · ${d.dept} · 반납예정: ${d.due}`} daysLeft={-d.over}/>)}
+          </div>
+        </Card>
+      </div>
+    </div>
+  );
+}
+
+function BookRegistrationScreen() {
+  const [toast, setToast] = React.useState(false);
+  const [search, setSearch] = React.useState('');
+  const filtered = BOOKS.filter(b=>!search||b.title.includes(search)||b.author.includes(search)||b.publisher.includes(search)||b.isbn.includes(search));
+  const cols = [
+    {key:'title',label:'도서명',width:'28%'},{key:'author',label:'저자',width:'14%'},
+    {key:'publisher',label:'출판사',width:'26%',secondary:true},
+    {key:'copies',label:'소장본 수',width:'12%'},
+  ];
+  return (
+    <div style={{padding:'32px 40px'}}>
+      <PageHeader title="도서 등록" />
+      <Card title="새 도서 등록" style={{marginBottom:20}}>
+        <Grid2>
+          <Input label="도서명" placeholder="도서명을 입력하세요" required />
+          <Input label="저자"   placeholder="저자를 입력하세요"   required />
+          <Input label="출판사" placeholder="출판사를 입력하세요" />
+        </Grid2>
+        <div style={{display:'flex',justifyContent:'flex-end',gap:8,marginTop:20}}>
+          <Button variant="ghost">초기화</Button>
+          <Button variant="primary" onClick={()=>setToast(true)}>등록</Button>
+        </div>
+      </Card>
+      <Card title="등록된 도서 목록" titleRight={<CountBadge n={`${filtered.length}건`} />} noPadding>
+        <div style={{padding:'14px 20px',borderBottom:'1px solid var(--color-border)'}}>
+          <SearchInput value={search} onChange={e=>setSearch(e.target.value)} placeholder="도서명, 저자 또는 출판사로 검색" />
+        </div>
+        <DataTable columns={cols} rows={filtered} pageSize={20} emptyText="검색 결과가 없습니다." />
+      </Card>
+      {toast && <Toast msg="도서가 등록되었습니다." onClose={()=>setToast(false)} />}
+    </div>
+  );
+}
+
+function CopyRegistrationScreen() {
+  const [toast, setToast] = React.useState('');
+  const [search, setSearch] = React.useState('');
+  const [changed, setChanged] = React.useState({});
+  const filtered = COPIES.filter(r=>!search||r.copyNo.includes(search)||r.title.includes(search));
+  const cols = [
+    {key:'copyNo',label:'관리번호',width:'18%',nowrap:true},{key:'title',label:'도서명',width:'36%'},
+    {key:'status',label:'상태',width:'14%'},{key:'_action',label:'상태 변경',width:'22%'},
+  ];
+  const statusOf = r => changed[r.copyNo] || r.status;
+  return (
+    <div style={{padding:'32px 40px'}}>
+      <PageHeader title="소장본 등록" sub="도서(Book)에 연결하여 실물 보유본을 등록합니다" />
+      <Card title="새 소장본 등록" style={{marginBottom:20}}>
+        <Grid2>
+          <Input label="도서명" placeholder="등록된 도서를 검색하세요" required />
+          <Input label="관리번호" placeholder="예: 문학-0001" hint="(주제)-(번호) 형식 · 중복 불가" required />
+        </Grid2>
+        <div style={{marginTop:16,fontSize:13,color:'var(--color-text-secondary)',display:'flex',alignItems:'center',gap:8}}>
+          등록 시 초기 상태 <Badge status="available" />
+        </div>
+        <div style={{display:'flex',justifyContent:'flex-end',gap:8,marginTop:20}}>
+          <Button variant="ghost">초기화</Button>
+          <Button variant="primary" onClick={()=>setToast('소장본이 등록되었습니다.')}>등록</Button>
+        </div>
+      </Card>
+      <Card title="소장본 목록" titleRight={<CountBadge n={`${filtered.length}건`} color="var(--color-copy)" bg="var(--color-copy-light)" />} noPadding>
+        <div style={{padding:'14px 20px',borderBottom:'1px solid var(--color-border)'}}>
+          <SearchInput value={search} onChange={e=>setSearch(e.target.value)} placeholder="관리번호 또는 도서명으로 검색" />
+        </div>
+        <DataTable columns={cols} rows={filtered} pageSize={20} emptyText="검색 결과가 없습니다."
+          renderCell={(col,v,row)=>{
+            if(col.key==='status') return <Badge status={statusOf(row)}/>;
+            if(col.key==='_action') {
+              const s = statusOf(row);
+              if(s==='lost'||s==='disposed') return <span style={{fontSize:13,color:'var(--color-text-secondary)'}}>—</span>;
+              if(s==='loaned'||s==='overdue') return <span style={{fontSize:13,color:'var(--color-text-placeholder)'}}>대출 중 변경 불가</span>;
+              return (
+                <div style={{display:'flex',gap:6}}>
+                  <Button variant="ghost" size="sm" onClick={()=>{setChanged(p=>({...p,[row.copyNo]:'lost'}));setToast(`${row.copyNo} 분실 처리되었습니다.`);}}>분실</Button>
+                  <Button variant="ghost" size="sm" onClick={()=>{setChanged(p=>({...p,[row.copyNo]:'disposed'}));setToast(`${row.copyNo} 폐기 처리되었습니다.`);}}>폐기</Button>
+                </div>
+              );
+            }
+            return v;
+          }} />
+      </Card>
+      {toast && <Toast msg={toast} onClose={()=>setToast('')} />}
+    </div>
+  );
+}
+
+function LoanRegistrationScreen() {
+  const [toast, setToast] = React.useState(false);
+  const [lentAt, setLentAt] = React.useState(TODAY);
+  const dueDate = lentAt ? addDays(lentAt, 14) : '';
+  const cols = [
+    {key:'copyNo',label:'관리번호',width:'14%',nowrap:true},{key:'title',label:'도서명',width:'24%'},
+    {key:'borrower',label:'대출자',width:'11%'},{key:'dept',label:'부서',width:'13%',secondary:true},
+    {key:'date',label:'대여일',width:'13%',secondary:true,nowrap:true},{key:'due',label:'반납예정일',width:'13%',secondary:true,nowrap:true},
+    {key:'status',label:'상태',width:'10%'},
+  ];
+  const active = LOANS.filter(r=>r.status!=='returned');
+  return (
+    <div style={{padding:'32px 40px'}}>
+      <PageHeader title="대출 등록" sub="소장본 관리번호 기준으로 대출을 등록합니다" />
+      <Card title="새 대출 등록" style={{marginBottom:20}}>
+        <Grid2>
+          <Input label="관리번호" placeholder="예: 문학-0001" hint="대출 가능 상태의 소장본만 등록됩니다" required />
+          <Input label="대출자 이름" placeholder="이름을 입력하세요" required />
+          <Input label="부서명" placeholder="부서를 입력하세요" required />
+          <Input label="대여일" type="date" value={lentAt} onChange={e=>setLentAt(e.target.value)} required />
+        </Grid2>
+        <div style={{marginTop:16,display:'flex',alignItems:'center',gap:10,padding:'12px 14px',borderRadius:8,background:'var(--color-primary-light)'}}>
+          <span style={{fontSize:13,color:'var(--color-text-secondary)'}}>반납 예정일 (대여일 +14일 자동 계산)</span>
+          <span style={{fontSize:15,fontWeight:600,color:'var(--color-primary)'}}>{dueDate || '—'}</span>
+        </div>
+        <div style={{display:'flex',justifyContent:'flex-end',gap:8,marginTop:20}}>
+          <Button variant="ghost" onClick={()=>setLentAt(TODAY)}>초기화</Button>
+          <Button variant="primary" onClick={()=>setToast(true)}>대출 등록</Button>
+        </div>
+      </Card>
+      <Card title="현재 대출 현황" noPadding>
+        <DataTable columns={cols} rows={active} pageSize={20} renderCell={(col,v,row)=>{
+          if(col.key==='status') return <Badge status={v}/>;
+          if(col.key==='date') return <span style={{fontSize:13,color:'var(--color-text-secondary)'}}>{row.date.slice(0,10)}</span>;
+          if(col.key==='borrower' && row.status==='returned') return <span style={{fontSize:13,color:'var(--color-text-placeholder)'}}>-</span>;
+          return v;
+        }} />
+      </Card>
+      {toast && <Toast msg="대출이 등록되었습니다. 소장본 상태가 '대출 중'으로 변경되었습니다." onClose={()=>setToast(false)} />}
+    </div>
+  );
+}
+
+function ReturnProcessingScreen() {
+  const [search, setSearch] = React.useState('');
+  const [done, setDone] = React.useState(new Set());
+  const [toast, setToast] = React.useState('');
+  const cols = [
+    {key:'copyNo',label:'관리번호',width:'13%',nowrap:true},{key:'title',label:'도서명',width:'24%'},
+    {key:'borrower',label:'대출자',width:'11%'},{key:'dept',label:'부서',width:'12%',secondary:true},
+    {key:'due',label:'반납예정일',width:'13%',secondary:true,nowrap:true},
+    {key:'status',label:'상태',width:'10%'},{key:'_action',label:'',width:'15%'},
+  ];
+  const rows = LOANS.filter(r=>r.status!=='returned')
+    .filter(r=>!search||r.title.includes(search)||r.borrower.includes(search)||r.copyNo.includes(search));
+  const key = r => r.copyNo;
+  return (
+    <div style={{padding:'32px 40px'}}>
+      <PageHeader title="반납 처리" sub="대출 중인 소장본만 반납 처리할 수 있습니다" />
+      <Card style={{marginBottom:20}}>
+        <SearchInput value={search} onChange={e=>setSearch(e.target.value)} placeholder="관리번호, 도서명 또는 대출자 이름으로 검색" />
+      </Card>
+      <Card title="반납 처리 대상" noPadding>
+        <DataTable columns={cols} rows={rows} pageSize={20}
+          renderCell={(col,v,row)=>{
+            if(col.key==='status') return <Badge status={done.has(key(row))?'returned':v}/>;
+            if(col.key==='_action') {
+              if(done.has(key(row))) return <span style={{fontSize:13,color:'var(--color-text-secondary)'}}>처리완료</span>;
+              return <Button variant="success" size="sm" onClick={()=>{setDone(p=>new Set([...p,key(row)]));setToast(`"${row.title}" 반납 처리되었습니다.`);}}>반납 처리</Button>;
+            }
+            return v;
+          }}
+        />
+      </Card>
+      {toast && <Toast msg={toast} onClose={()=>setToast('')} />}
+    </div>
+  );
+}
+
+function LoanHistoryScreen() {
+  const [search, setSearch] = React.useState('');
+  const [status, setStatus] = React.useState('');
+  const all = [
+    ...LOANS,
+    {copyNo:'사회-0031',title:'자원봉사론',    borrower:'윤상혁',dept:'행정과',    date:'2026-02-10',due:'2026-02-24',returnedAt:'2026-02-21',status:'returned'},
+    {copyNo:'노인-0005',title:'노인복지론',    borrower:'한미선',dept:'기획팀',    date:'2026-02-05',due:'2026-02-19',returnedAt:'2026-02-19',status:'returned'},
+    {copyNo:'사회-0018',title:'사회복지조사론',borrower:'임채린',dept:'사회복지과',date:'2026-01-20',due:'2026-02-03',returnedAt:'2026-02-06',status:'returned'},
+  ];
+  const filtered = all.filter(r=>(!search||(r.title.includes(search)||r.borrower.includes(search)||r.dept.includes(search)||r.copyNo.includes(search)))&&(!status||r.status===status));
+  const cols = [
+    {key:'copyNo',label:'관리번호',width:'12%',nowrap:true},{key:'title',label:'도서명',width:'20%'},
+    {key:'borrower',label:'대출자',width:'9%'},{key:'dept',label:'부서',width:'11%',secondary:true},
+    {key:'date',label:'대여일',width:'11%',secondary:true,nowrap:true},
+    {key:'due',label:'반납예정일',width:'11%',secondary:true,nowrap:true},
+    {key:'returnedAt',label:'반납일',width:'11%',nowrap:true},{key:'status',label:'상태',width:'9%'},
+  ];
+  return (
+    <div style={{padding:'32px 40px'}}>
+      <PageHeader title="대출 내역 조회" sub={`총 ${all.length}건`} />
+      <Card padding="sm" style={{marginBottom:16}}>
+        <div style={{display:'flex',gap:10,alignItems:'center'}}>
+          <SearchInput value={search} onChange={e=>setSearch(e.target.value)} placeholder="도서명, 대출자, 부서, 관리번호 검색" />
+          <StatusSelect value={status} onChange={e=>setStatus(e.target.value)} />
+          <Button variant="ghost" size="sm" onClick={()=>{setSearch('');setStatus('');}}>초기화</Button>
+        </div>
+      </Card>
+      <Card noPadding>
+        <DataTable columns={cols} rows={filtered} pageSize={20} emptyText="검색 결과가 없습니다."
+          renderCell={(col,v,row)=>{
+            if(col.key==='status') return <Badge status={v}/>;
+            if(col.key==='date') return <span style={{fontSize:13,color:'var(--color-text-secondary)'}}>{row.date.slice(0,10)}</span>;
+            if(col.key==='borrower' && row.status==='returned') return <span style={{fontSize:13,color:'var(--color-text-placeholder)'}}>-</span>;
+            if(col.key==='returnedAt') return row.returnedAt
+              ? <span style={{fontSize:13,color:'var(--color-text-primary)'}}>{row.returnedAt.slice(0,10)}</span>
+              : <span style={{fontSize:13,color:'var(--color-text-placeholder)'}}>—</span>;
+            return v;
+          }} />
+      </Card>
+    </div>
+  );
+}
+
+function SuggestionBanner({ query, suggestion, hasResults, onApply }) {
+  const [hover, setHover] = React.useState(false);
+  return (
+    <div style={{overflow:'hidden'}}>
+      <div style={{animation:'sugSlide .22s ease-out',display:'flex',alignItems:'baseline',gap:8,flexWrap:'wrap',
+        fontSize:14,lineHeight:1.6,marginTop:14}}>
+        <span style={{color:'var(--color-text-secondary)'}}>
+          {hasResults ? '“' + query + '”' + withEun(query).slice(query.length) + ' 오타일 수 있어요.' : '“' + query + '”에 대한 검색 결과가 없습니다.'}
+        </span>
+        <button onClick={onApply} onMouseEnter={()=>setHover(true)} onMouseLeave={()=>setHover(false)}
+          style={{background:'none',border:'none',padding:0,font:'inherit',cursor:'pointer',fontWeight:600,color:'var(--color-primary)',
+            textDecoration:hover?'underline':'none',textUnderlineOffset:3}}>
+          “{suggestion}”{withEuro(suggestion).slice(suggestion.length)} 검색
+        </button>
+      </div>
+    </div>
+  );
+}
+
+function BookSearchScreen() {
+  const [search, setSearch] = React.useState('');
+  const [selected, setSelected] = React.useState(null);
+  const exact = BOOKS.filter(b=>!search||b.title.includes(search)||b.author.includes(search)||b.publisher.includes(search)||b.isbn.includes(search));
+  const loose = React.useMemo(()=>{
+    if(!search || exact.length) return [];
+    const gs = bigrams(search);
+    if(!gs.length) return [];
+    return BOOKS.map(b=>({b,score:gs.filter(g=>(b.title+b.author+b.publisher).replace(/\s/g,'').includes(g)).length}))
+      .filter(x=>x.score>=3).sort((a,b)=>b.score-a.score).map(x=>x.b);
+  },[search,exact.length]);
+  const books = exact.length ? exact : loose;
+  /* suggestion no longer depends on the result count */
+  const suggestion = search ? (SEARCH_TYPO_MAP[search.replace(/\s/g,'')] || null) : null;
+  const showBanner = !!suggestion && !exact.length;
+  const bookCols = [
+    {key:'title',label:'도서명',width:'32%'},{key:'author',label:'저자',width:'14%'},
+    {key:'publisher',label:'출판사',width:'28%',secondary:true},
+    {key:'copies',label:'소장본',width:'16%',nowrap:true},
+  ];
+  const copyCols = [
+    {key:'copyNo',label:'관리번호',width:'32%',nowrap:true},{key:'status',label:'상태',width:'24%'},
+    {key:'_borrower',label:'대출자',width:'22%'},{key:'_due',label:'반납예정일',width:'22%',secondary:true,nowrap:true},
+  ];
+  const rows = selected ? copiesOf(selected.title) : [];
+  const loanOf = copyNo => LOANS.find(l=>l.copyNo===copyNo && l.status!=='returned');
+  return (
+    <div style={{padding:'32px 40px'}}>
+      <PageHeader title="도서 검색" sub="도서를 검색하고 행을 선택하면 소장본 목록이 표시됩니다" />
+      <Card padding="sm" style={{marginBottom:16}}>
+        <div style={{display:'flex',gap:10,alignItems:'center'}}>
+          <SearchInput value={search} onChange={e=>{setSearch(e.target.value);setSelected(null);}} placeholder="도서명, 저자 검색" />
+          <Button variant="ghost" size="sm" onClick={()=>{setSearch('');setSelected(null);}}>초기화</Button>
+        </div>
+        {showBanner && <SuggestionBanner query={search} suggestion={suggestion} hasResults={books.length>0} onApply={()=>{setSearch(suggestion);setSelected(null);}} />}
+      </Card>
+      <div style={{display:'flex',flexWrap:'wrap',gap:20}}>
+        <Card title="검색 결과" titleRight={<CountBadge n={`${books.length}건`} />} noPadding style={{flex:'2 1 520px',minWidth:0}}>
+          {!exact.length && books.length>0 && (
+            <div style={{padding:'10px 20px',borderBottom:'1px solid var(--color-border)',fontSize:12,color:'var(--color-text-secondary)'}}>정확히 일치하는 도서가 없어 유사한 도서를 보여줍니다.</div>
+          )}
+          <DataTable columns={bookCols} rows={books} pageSize={10}
+            emptyText="검색 결과가 없습니다."
+            onRowClick={row=>setSelected(row)}
+            renderCell={(col,v,row)=>{
+              if(col.key==='copies') {
+                const avail = copiesOf(row.title).filter(c=>c.status==='available').length;
+                return <span style={{fontSize:13,color:'var(--color-text-secondary)'}}>{v}권 <span style={{color:'var(--color-success)',fontWeight:600}}>· 대출가능 {avail}</span></span>;
+              }
+              if(col.key==='title') return <span style={{fontWeight:selected&&selected.title===row.title?600:400,color:selected&&selected.title===row.title?'var(--color-primary)':'inherit'}}>{v}</span>;
+              return v;
+            }} />
+        </Card>
+        <Card title={selected ? `소장본 · ${selected.title}` : '소장본 목록'}
+          titleRight={selected ? <CountBadge n={`${rows.length}권`} color="var(--color-copy)" bg="var(--color-copy-light)" /> : null}
+          noPadding style={{flex:'1 1 400px',minWidth:0}}>
+          {selected ? (
+            <React.Fragment>
+              <div style={{padding:'12px 20px',borderBottom:'1px solid var(--color-border)',display:'flex',gap:20,flexWrap:'wrap',fontSize:13,color:'var(--color-text-secondary)'}}>
+                <span>저자 <b style={{color:'var(--color-text-primary)',fontWeight:600}}>{selected.author}</b></span>
+                <span>출판사 <b style={{color:'var(--color-text-primary)',fontWeight:600}}>{selected.publisher}</b></span>
+                <span>ISBN <b style={{color:'var(--color-text-primary)',fontWeight:600}}>{selected.isbn}</b></span>
+              </div>
+              <DataTable columns={copyCols} rows={rows} emptyText="등록된 소장본이 없습니다."
+                renderCell={(col,v,row)=>{
+                  if(col.key==='status') return <Badge status={row.status}/>;
+                  const loan = loanOf(row.copyNo);
+                  if(col.key==='_borrower') return loan
+                    ? <span style={{fontSize:13}}>{loan.borrower}</span>
+                    : <span style={{fontSize:13,color:'var(--color-text-placeholder)'}}>—</span>;
+                  if(col.key==='_due') return loan
+                    ? <span style={{fontSize:13,color:row.status==='overdue'?'var(--color-danger)':'var(--color-text-secondary)',fontWeight:row.status==='overdue'?600:400}}>{loan.due}</span>
+                    : <span style={{fontSize:13,color:'var(--color-text-placeholder)'}}>—</span>;
+                  return v;
+                }} />
+            </React.Fragment>
+          ) : (
+            <div style={{padding:'56px 24px',textAlign:'center',fontSize:14,color:'var(--color-text-placeholder)'}}>
+              왼쪽 목록에서 도서를 선택하세요.
+            </div>
+          )}
+        </Card>
+      </div>
+    </div>
+  );
+}
+
+/* ── Excel import fixtures (POST /imports/excel — synchronous, all-or-nothing) ─────── */
+const IMPORT_DEMO_FILES = [
+  {key:'ok',  name:'bookList.xlsx',           size:'481 KB', outcome:'success'},
+  {key:'err', name:'산림_입고분_수정전.xlsx', size:'34 KB',  outcome:'error'},
+];
+const IMPORT_SUCCESS = {
+  committedAt:'2026-08-24T15:28:15',
+  sheets:['산림','문학(신규)','환경, 과학','자기계발','경영','리더십, 정치·사회','세계사, 역사','인문, 철학 ,심리','여행','건축','삽화, 예술','학습','시리즈'],
+  totalRows:4838, createdBooks:2874, createdBookItems:4838, okRows:4700, warnRows:138,
+  warnings:[
+    {sheet:'문학(신규)', rowNumber:104, managementNumber:'삽화-2', title:'그리스Greece', code:'MANAGEMENT_NUMBER_NORMALIZED', message:'관리번호 형식 불일치 · 삽화-2로 정규화'},
+    {sheet:'경영', rowNumber:37, managementNumber:'경영-2', title:'화이트칼라6시그마경영혁신', code:'AUTHOR_MISSING_DEFAULTED', message:'저자명 공백 · 미상으로 등록'},
+    {sheet:'산림', rowNumber:2, managementNumber:'산림-2', title:'한국의아름다운숲', code:'DUPLICATE_BOOK_MERGED', message:'기존 도서와 동일 · 소장본만 추가'},
+  ],
+};
+const IMPORT_ERROR = {
+  errorRows:5,
+  errors:[
+    {sheet:'산림', rowNumber:1, managementNumber:'산림-1', title:'대한민국숲의역사', code:'DUPLICATE_MANAGEMENT_NUMBER_IN_DB', message:'이미 등록된 관리번호입니다.', errorField:'managementNumber'},
+    {sheet:'문학(신규)', rowNumber:15, managementNumber:'문학-2', title:'말의 힘', code:'DUPLICATE_MANAGEMENT_NUMBER_IN_FILE', message:'같은 파일 내에서 관리번호가 중복되었습니다.', errorField:'managementNumber'},
+    {sheet:'학습', rowNumber:22, managementNumber:'학습-2', title:'', code:'TITLE_REQUIRED', message:'도서명이 비어 있습니다.', errorField:'title'},
+    {sheet:'시리즈', rowNumber:88, managementNumber:'', title:'한국사이야기2', code:'MANAGEMENT_NUMBER_REQUIRED', message:'관리번호가 비어 있습니다.', errorField:'managementNumber'},
+    {sheet:'시리즈', rowNumber:89, managementNumber:'', title:'한국사이야기3', code:'MANAGEMENT_NUMBER_REQUIRED', message:'관리번호가 비어 있습니다.', errorField:'managementNumber'},
+  ],
+};
+const EXPORT_SHEETS = [
+  {id:'BOOKS',      name:'도서',   rows:4399, cols:['도서명','저자','출판사','ISBN','소장본 수','등록일']},
+  {id:'BOOK_ITEMS', name:'소장본', rows:4838, cols:['관리번호','도서명','상태','등록일','최근 대출일']},
+  {id:'LOANS',      name:'대여',   rows:2841, cols:['관리번호','도서명','부서','대여일','반납예정일','반납일','상태']},
+];
+
+function Pill({ text, tone }) {
+  const map = {
+    ok:   ['var(--color-success)','var(--color-success-light)'],
+    warn: ['#8A5A00','#FFF4E0'],
+    error:['var(--color-danger)','var(--color-danger-light)'],
+    info: ['var(--color-primary)','var(--color-primary-light)'],
+  };
+  const [c,bg] = map[tone] || map.info;
+  return <span style={{fontSize:12,fontWeight:600,color:c,background:bg,padding:'3px 9px',borderRadius:6,whiteSpace:'nowrap'}}>{text}</span>;
+}
+function Toggle({ on, onChange, label }) {
+  return (
+    <label style={{display:'flex',alignItems:'center',gap:8,cursor:'pointer',fontSize:13,color:'var(--color-text-secondary)'}}>
+      <span onClick={()=>onChange(!on)} style={{width:38,height:22,borderRadius:9999,background:on?'var(--color-primary)':'var(--color-border)',position:'relative',transition:'background .15s',flexShrink:0}}>
+        <span style={{position:'absolute',top:2,left:on?18:2,width:18,height:18,borderRadius:9999,background:'#fff',transition:'left .15s',boxShadow:'var(--shadow-sm)'}}></span>
+      </span>
+      {label}
+    </label>
+  );
+}
+function CheckRow({ checked, onChange, children, style }) {
+  return (
+    <label style={{display:'flex',alignItems:'center',gap:10,cursor:'pointer',...style}}>
+      <input type="checkbox" checked={checked} onChange={onChange} style={{width:15,height:15,accentColor:'var(--color-primary)',flexShrink:0}} />
+      {children}
+    </label>
+  );
+}
+
+function ExcelImportScreen({ onNavigate }) {
+  const [phase, setPhase] = React.useState('idle'); // idle | picked | uploading | success | error
+  const [file, setFile] = React.useState(null);
+  const [warnOpen, setWarnOpen] = React.useState(false);
+  const [toast, setToast] = React.useState('');
+
+  const pick = demo => { setFile(demo); setPhase('picked'); };
+  const upload = () => {
+    setPhase('uploading');
+    setTimeout(()=> setPhase(file.outcome), 700);
+  };
+  const reset = () => { setFile(null); setPhase('idle'); setWarnOpen(false); };
+
+  return (
+    <div style={{padding:'32px 40px'}}>
+      <PageHeader title="엑셀 일괄 등록" sub="하나의 엑셀 파일로 도서와 소장본을 함께 등록합니다" />
+
+      {(phase==='idle' || phase==='picked' || phase==='uploading') && (
+        <React.Fragment>
+          <Card title="엑셀 파일" style={{marginBottom:20}}>
+            {phase==='idle' ? (
+              <div style={{display:'flex',flexDirection:'column',gap:14}}>
+                <div style={{border:'1.5px dashed var(--color-border)',borderRadius:12,padding:'44px 24px',textAlign:'center',background:'var(--color-bg)'}}>
+                  <div style={{fontSize:15,fontWeight:600,color:'var(--color-text-primary)',marginBottom:6}}>파일을 끌어다 놓거나 아래에서 선택하세요</div>
+                  <div style={{fontSize:13,color:'var(--color-text-secondary)'}}>.xlsx · .xls · 최대 20MB · 첫 행은 머리글로 처리됩니다</div>
+                </div>
+                <div style={{display:'flex',gap:10,flexWrap:'wrap'}}>
+                  {IMPORT_DEMO_FILES.map(d=>(
+                    <button key={d.key} onClick={()=>pick(d)}
+                      style={{display:'flex',alignItems:'center',gap:10,padding:'10px 14px',borderRadius:8,border:'1px solid var(--color-border)',background:'var(--color-surface)',cursor:'pointer',font:'inherit'}}>
+                      <span style={{fontSize:13,fontWeight:600,color:'var(--color-text-primary)'}}>{d.name}</span>
+                      <span style={{fontSize:12,color:'var(--color-text-secondary)'}}>{d.size}</span>
+                    </button>
+                  ))}
+                </div>
+              </div>
+            ) : (
+              <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',gap:16,padding:'14px 16px',borderRadius:10,background:'var(--color-primary-light)'}}>
+                <div style={{minWidth:0}}>
+                  <div style={{fontSize:14,fontWeight:600,color:'var(--color-text-primary)'}}>{file.name}</div>
+                  <div style={{fontSize:12,color:'var(--color-text-secondary)',marginTop:2}}>{file.size}</div>
+                </div>
+                {phase==='picked' ? <Button variant="ghost" size="sm" onClick={reset}>제거</Button>
+                  : <span style={{fontSize:13,color:'var(--color-primary)',fontWeight:600}}>업로드 중…</span>}
+              </div>
+            )}
+          </Card>
+          <div style={{fontSize:12,color:'var(--color-text-secondary)',lineHeight:1.7,marginBottom:20}}>
+            · 도서명 + 출판사 + 저자가 모두 같으면 동일 도서로 보고 소장본만 추가합니다<br/>
+            · 파일 형식이 다르거나(INVALID_FILE_TYPE), 읽을 수 없거나(UNREADABLE_FILE), 필수 컬럼이 없거나(REQUIRED_COLUMN_NOT_FOUND), 20MB를 초과하면(FILE_TOO_LARGE) 업로드가 즉시 거부됩니다
+          </div>
+          <div style={{display:'flex',justifyContent:'flex-end',gap:8}}>
+            <Button variant="primary" disabled={phase!=='picked'} onClick={upload}>{phase==='uploading' ? '업로드 중…' : '엑셀 파일 등록'}</Button>
+          </div>
+        </React.Fragment>
+      )}
+
+      {phase==='success' && (
+        <React.Fragment>
+          <Card style={{marginBottom:20}}>
+            <div style={{display:'flex',alignItems:'center',gap:14}}>
+              <div style={{width:44,height:44,borderRadius:12,background:'var(--color-success-light)',display:'flex',alignItems:'center',justifyContent:'center',flexShrink:0}}>
+                <svg width="24" height="24" viewBox="0 0 24 24" fill="none"><path d="M6 12.5l4 4 8-8" stroke="var(--color-success)" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/></svg>
+              </div>
+              <div>
+                <div style={{fontSize:18,fontWeight:700,color:'var(--color-text-primary)',letterSpacing:'-0.02em'}}>{`${IMPORT_SUCCESS.createdBooks.toLocaleString()}권 등록완료 (경고 ${IMPORT_SUCCESS.warnRows}건)`}</div>
+                <div style={{fontSize:13,color:'var(--color-text-secondary)',marginTop:2}}>{file.name} · 시트 {IMPORT_SUCCESS.sheets.length}개 · {IMPORT_SUCCESS.committedAt.replace('T',' ')} 처리</div>
+              </div>
+            </div>
+          </Card>
+          <div style={{display:'grid',gridTemplateColumns:'repeat(auto-fit, minmax(200px, 1fr))',gap:20,marginBottom:20}}>
+            <StatCard label="처리 행"     value={IMPORT_SUCCESS.totalRows.toLocaleString()} sub={`시트 ${IMPORT_SUCCESS.sheets.length}개`} iconBg="var(--color-primary-light)" icon={<BookSvg />} />
+            <StatCard label="등록 도서"   value={IMPORT_SUCCESS.createdBooks.toLocaleString()} sub="신규 생성" iconBg="var(--color-primary-light)" icon={<BookSvg />} />
+            <StatCard label="등록 소장본" value={IMPORT_SUCCESS.createdBookItems.toLocaleString()} sub="전량 대출 가능 상태" subColor="var(--color-success)" iconBg="var(--color-copy-light)" icon={<CopySvg />} />
+            <StatCard label="정상 / 경고" value={`${IMPORT_SUCCESS.okRows.toLocaleString()} / ${IMPORT_SUCCESS.warnRows}`} sub="경고 행도 값을 정규화해 등록됨" iconBg="#FFF4E0" icon={<AlertSvg />} />
+          </div>
+          <Card title="경고 목록" noPadding
+            titleRight={<Button variant="ghost" size="sm" onClick={()=>setWarnOpen(v=>!v)}>{warnOpen?'접기':`${IMPORT_SUCCESS.warnRows}건 펼치기`}</Button>}>
+            {warnOpen && (
+              <DataTable
+                columns={[{key:'sheet',label:'시트',width:'16%',secondary:true,nowrap:true},{key:'rowNumber',label:'행',width:'8%',nowrap:true},
+                  {key:'managementNumber',label:'관리번호',width:'14%',nowrap:true},{key:'title',label:'도서명',width:'26%'},{key:'message',label:'내용',width:'36%',secondary:true}]}
+                rows={IMPORT_SUCCESS.warnings} emptyText="경고가 없습니다." />
+            )}
+          </Card>
+          <div style={{display:'flex',justifyContent:'flex-end',gap:8,marginTop:20}}>
+            <Button variant="ghost" onClick={reset}>다른 파일 등록</Button>
+            <Button variant="primary" onClick={()=>onNavigate('book-search')}>도서 검색으로 이동</Button>
+          </div>
+        </React.Fragment>
+      )}
+
+      {phase==='error' && (
+        <React.Fragment>
+          <Card style={{marginBottom:20}}>
+            <div style={{display:'flex',alignItems:'center',gap:14}}>
+              <div style={{width:44,height:44,borderRadius:12,background:'var(--color-danger-light)',display:'flex',alignItems:'center',justifyContent:'center',flexShrink:0}}>
+                <svg width="24" height="24" viewBox="0 0 24 24" fill="none"><path d="M7 7l10 10M17 7L7 17" stroke="var(--color-danger)" strokeWidth="2" strokeLinecap="round"/></svg>
+              </div>
+              <div>
+                <div style={{fontSize:18,fontWeight:700,color:'var(--color-text-primary)',letterSpacing:'-0.02em'}}>{`오류 ${IMPORT_ERROR.errorRows}건으로 등록되지 않았습니다`}</div>
+                <div style={{fontSize:13,color:'var(--color-text-secondary)',marginTop:2}}>오류가 있으면 파일 전체가 등록되지 않습니다 (all-or-nothing)</div>
+              </div>
+            </div>
+          </Card>
+          <div style={{padding:'12px 14px',borderRadius:8,background:'var(--color-danger-light)',fontSize:13,color:'var(--color-danger)',fontWeight:600,marginBottom:20}}>
+            엑셀 파일을 직접 고쳐서 다시 업로드해주세요. 화면에서 행을 직접 수정하는 기능은 없습니다.
+          </div>
+          <Card title="오류 목록" noPadding style={{marginBottom:20}}>
+            <DataTable
+              columns={[{key:'sheet',label:'시트',width:'14%',secondary:true,nowrap:true},{key:'rowNumber',label:'행',width:'7%',nowrap:true},
+                {key:'managementNumber',label:'관리번호',width:'13%',nowrap:true},{key:'title',label:'도서명',width:'20%'},
+                {key:'errorField',label:'필드',width:'12%',secondary:true},{key:'message',label:'내용',width:'34%'}]}
+              rows={IMPORT_ERROR.errors}
+              renderCell={(col,v)=>{
+                if(!v) return <span style={{fontSize:13,color:'var(--color-text-placeholder)'}}>—</span>;
+                if(col.key==='message') return <span style={{color:'var(--color-danger)'}}>{v}</span>;
+                return v;
+              }} />
+          </Card>
+          <div style={{display:'flex',justifyContent:'flex-end',gap:8}}>
+            <Button variant="primary" onClick={reset}>파일 다시 업로드</Button>
+          </div>
+        </React.Fragment>
+      )}
+      {toast && <Toast msg={toast} onClose={()=>setToast('')} />}
+    </div>
+  );
+}
+
+function DataExportScreen() {
+  const [sel, setSel] = React.useState(()=>new Set(['BOOKS','BOOK_ITEMS','LOANS']));
+  const [from, setFrom] = React.useState('2026-01-01');
+  const [to, setTo] = React.useState(TODAY);
+  const [inactive, setInactive] = React.useState(true);
+  const [unreturnedOnly, setUnreturnedOnly] = React.useState(false);
+  const [toast, setToast] = React.useState('');
+  const fileName = `library_export_${TODAY}.xlsx`;
+  const run = () => setToast(`${fileName} 파일을 다운로드했습니다.`);
+  return (
+    <div style={{padding:'32px 40px'}}>
+      <PageHeader title="내보내기" sub="저장된 데이터를 엑셀 파일로 바로 다운로드합니다 · 도서 / 소장본 / 대여 세 시트" />
+      <div style={{display:'flex',flexWrap:'wrap',gap:20,marginBottom:20}}>
+        <Card title="포함할 시트" style={{flex:'2 1 520px',minWidth:0}}>
+          <div style={{display:'flex',flexDirection:'column',gap:10}}>
+            {EXPORT_SHEETS.map(s=>(
+              <CheckRow key={s.id} checked={sel.has(s.id)}
+                onChange={()=>setSel(p=>{const n=new Set(p); n.has(s.id)?n.delete(s.id):n.add(s.id); return n;})}
+                style={{alignItems:'flex-start',padding:'14px 16px',border:'1px solid var(--color-border)',borderRadius:10,background:sel.has(s.id)?'var(--color-primary-light)':'var(--color-surface)'}}>
+                <div style={{minWidth:0}}>
+                  <div style={{display:'flex',alignItems:'center',gap:8,marginBottom:4}}>
+                    <span style={{fontSize:14,fontWeight:600,color:'var(--color-text-primary)'}}>{s.name}</span>
+                  </div>
+                  <div style={{fontSize:12,color:'var(--color-text-secondary)',lineHeight:1.6}}>{s.cols.join(' · ')}</div>
+                </div>
+              </CheckRow>
+            ))}
+          </div>
+        </Card>
+        <Card title="내보내기 옵션" style={{flex:'1 1 360px',minWidth:0}}>
+          <div style={{display:'flex',flexDirection:'column',gap:16}}>
+            <div>
+              <div style={{fontSize:13,fontWeight:600,color:'var(--color-text-primary)',marginBottom:8}}>대여 기간</div>
+              <div style={{display:'flex',alignItems:'center',gap:8}}>
+                <Input type="date" value={from} onChange={e=>setFrom(e.target.value)} />
+                <span style={{color:'var(--color-text-placeholder)'}}>~</span>
+                <Input type="date" value={to} onChange={e=>setTo(e.target.value)} />
+              </div>
+              <div style={{fontSize:12,color:'var(--color-text-secondary)',marginTop:6}}>대여 시트에만 적용됩니다</div>
+            </div>
+            <div style={{display:'flex',flexDirection:'column',gap:10,paddingTop:4}}>
+              <Toggle on={inactive} onChange={setInactive} label="분실·폐기 소장본 포함" />
+              <Toggle on={unreturnedOnly} onChange={setUnreturnedOnly} label="미반납 건만 내보내기" />
+            </div>
+            <div style={{padding:'12px 14px',borderRadius:8,background:'var(--color-bg)'}}>
+              <div style={{fontSize:12,color:'var(--color-text-secondary)',marginBottom:4}}>파일명</div>
+              <div style={{fontSize:13,fontWeight:600,color:'var(--color-text-primary)',wordBreak:'break-all'}}>{fileName}</div>
+            </div>
+            <Button variant="primary" fullWidth disabled={sel.size===0} onClick={run}>엑셀 내보내기</Button>
+          </div>
+        </Card>
+      </div>
+      {toast && <Toast msg={toast} onClose={()=>setToast('')} />}
+    </div>
+  );
+}
+
+/* ── Admin hub ───────────────────────────────────────── */
+const ADMIN_ITEMS = [
+  { id:'book-register', label:'도서 등록',      desc:'ISBN 조회로 새 도서를 등록합니다.' },
+  { id:'copy-register', label:'소장본 등록',    desc:'등록된 도서의 실물 소장본을 추가합니다.' },
+  { id:'loan-history',  label:'대출 내역 조회', desc:'전체 대출·반납 이력을 조회합니다.' },
+  { id:'excel-import',  label:'엑셀 일괄 등록', desc:'엑셀 파일로 도서를 한 번에 등록합니다.' },
+  { id:'data-export',   label:'내보내기',      desc:'데이터를 엑셀/CSV로 내려받습니다.' },
+];
+function AdminTabsLayout({ active, onNavigate, children }) {
+  const [hover, setHover] = React.useState(null);
+  return (
+    <div>
+      <div style={{background:'var(--color-surface)',borderBottom:'1px solid var(--color-border)',padding:'0 40px'}}>
+        <div style={{display:'flex',gap:4}}>
+          {ADMIN_ITEMS.map(it=>{
+            const on = it.id===active;
+            return (
+              <button key={it.id} onClick={()=>onNavigate(it.id)}
+                onMouseEnter={()=>setHover(it.id)} onMouseLeave={()=>setHover(null)}
+                title={it.desc}
+                style={{padding:'11px 16px',border:'none',background:'none',cursor:'pointer',font:'inherit',fontSize:14,
+                  fontWeight:on?600:500,color:on?'var(--color-primary)':(hover===it.id?'var(--color-text-primary)':'var(--color-text-secondary)'),
+                  borderBottom:'2px solid '+(on?'var(--color-primary)':'transparent'),marginBottom:-1,transition:'color .12s ease'}}>
+                {it.label}
+              </button>
+            );
+          })}
+        </div>
+      </div>
+      {children}
+    </div>
+  );
+}
+/* ── App Root ────────────────────────────────────────── */
+function App() {
+  const [loggedIn, setLoggedIn] = React.useState(()=>localStorage.getItem('lib_ds_loggedIn')==='1');
+  const [screen,   setScreen]   = React.useState(()=>{
+    const s = localStorage.getItem('lib_ds_screen');
+    return (s && s!=='overdue') ? s : 'dashboard';
+  });
+
+  const login    = ()=>{ localStorage.setItem('lib_ds_loggedIn','1'); setLoggedIn(true); };
+  const logout   = ()=>{ localStorage.removeItem('lib_ds_loggedIn'); setLoggedIn(false); };
+  const navigate = s=>{ localStorage.setItem('lib_ds_screen',s); setScreen(s); };
+
+  if (!loggedIn) return <LoginScreen onLogin={login} />;
+
+  const SCREENS = {
+    'dashboard':     <DashboardScreen />,
+    'loan-register': <LoanRegistrationScreen />,
+    'return':        <ReturnProcessingScreen />,
+    'book-search':   <BookSearchScreen />,
+  };
+  const ADMIN_SCREENS = {
+    'book-register': <BookRegistrationScreen />,
+    'copy-register': <CopyRegistrationScreen />,
+    'loan-history':  <LoanHistoryScreen />,
+    'excel-import':  <ExcelImportScreen onNavigate={navigate} />,
+    'data-export':   <DataExportScreen />,
+  };
+  const inAdmin = !!ADMIN_SCREENS[screen] || screen === 'admin';
+  const adminId = ADMIN_SCREENS[screen] ? screen : 'book-register';
+  const body = inAdmin
+    ? <AdminTabsLayout active={adminId} onNavigate={navigate}>{ADMIN_SCREENS[adminId]}</AdminTabsLayout>
+    : (SCREENS[screen] || <DashboardScreen />);
+
+  return (
+    <div style={{display:'flex',height:'100vh',background:'var(--color-bg)',overflow:'hidden'}}>
+      <Sidebar activeId={inAdmin ? 'admin' : screen} onSelect={navigate} onLogout={logout} />
+      <main style={{flex:1,overflowY:'auto'}}>
+        {body}
+      </main>
+    </div>
+  );
+}
+
+(function bootstrap() {
+  if (!window.DesignSystem_307f43) { setTimeout(bootstrap, 200); return; }
+  ({ Button, Badge, Input, Card, StatCard, DdayCard, DataTable, Sidebar } = window.DesignSystem_307f43);
+  ReactDOM.render(<App />, document.getElementById('root'));
+})();
+</script>
+</body>
+</html>

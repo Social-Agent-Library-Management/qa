@@ -1,0 +1,43 @@
+:root {
+  /* ── Primary ─────────────────────────────────────────── */
+  --color-primary:        #007AFF;
+  --color-primary-hover:  #0062CC;
+  --color-primary-light:  #E5F0FF;
+  --color-primary-muted:  rgba(0, 122, 255, 0.10);
+
+  /* ── Background & Surface ────────────────────────────── */
+  --color-bg:               #F2F2F7;
+  --color-surface:          #FFFFFF;
+  --color-surface-secondary:#F9F9FB;
+
+  /* ── Border ──────────────────────────────────────────── */
+  --color-border:           #E5E5EA;
+  --color-border-strong:    #C7C7CC;
+
+  /* ── Text ────────────────────────────────────────────── */
+  --color-text-primary:     #1C1C1E;
+  --color-text-secondary:   #8E8E93;
+  --color-text-placeholder: #C7C7CC;
+  --color-text-inverse:     #FFFFFF;
+
+  /* ── Semantic: Success ───────────────────────────────── */
+  --color-success:          #34C759;
+  --color-success-light:    #E5FFE9;
+
+  /* ── Semantic: Danger ────────────────────────────────── */
+  --color-danger:           #FF3B30;
+  --color-danger-light:     #FFE5E5;
+
+  /* ── Semantic: Warning ───────────────────────────────── */
+  --color-warning:          #FF9500;
+  --color-warning-light:    #FFF0D6;
+  --color-warning-bg:       #FFFAF0;
+
+  /* ── Badge: Copy (소장본) ─────────────────────────────── */
+  --color-copy:             #5856D6;
+  --color-copy-light:       #EDE5FF;
+
+  /* ── Urgency (D-day card backgrounds) ────────────────── */
+  --color-urgent-bg:        #FFF5F5;
+  --color-normal-bg:        #F9F9FB;
+}

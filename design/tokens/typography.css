@@ -1,0 +1,39 @@
+/* ── Webfont ────────────────────────────────────────────────────────────────
+   Noto Sans KR is used as a substitute for Apple SD Gothic Neo.
+   Apple SD Gothic Neo is a system font available only on Apple devices.
+   Replace this @import with an actual font file + @font-face rule if you
+   obtain the Apple SD Gothic Neo OTF/TTF files from the brand.
+   ─────────────────────────────────────────────────────────────────────────── */
+@import url('https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@400;500;600;700&display=swap');
+
+:root {
+  /* ── Font Family ─────────────────────────────────────── */
+  --font-family-base: 'Noto Sans KR', 'Apple SD Gothic Neo', -apple-system,
+                      BlinkMacSystemFont, 'Malgun Gothic', sans-serif;
+
+  /* ── Scale ───────────────────────────────────────────── */
+  --font-size-xs:   11px;
+  --font-size-sm:   12px;
+  --font-size-base: 13px;
+  --font-size-md:   14px;
+  --font-size-body: 15px;
+  --font-size-lg:   17px;
+  --font-size-xl:   18px;
+  --font-size-2xl:  22px;
+  --font-size-3xl:  28px;
+
+  /* ── Weight ──────────────────────────────────────────── */
+  --font-weight-regular:  400;
+  --font-weight-medium:   500;
+  --font-weight-semibold: 600;
+  --font-weight-bold:     700;
+
+  /* ── Line Height ─────────────────────────────────────── */
+  --line-height-tight:   1.2;
+  --line-height-base:    1.5;
+  --line-height-relaxed: 1.65;
+
+  /* ── Letter Spacing ──────────────────────────────────── */
+  --letter-spacing-tight:  -0.03em;
+  --letter-spacing-normal: -0.01em;
+}

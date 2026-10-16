@@ -1,0 +1,17 @@
+:root {
+  /* ── Scale ───────────────────────────────────────────── */
+  --radius-sm:   4px;
+  --radius-md:   8px;
+  --radius-lg:   12px;
+  --radius-xl:   16px;
+  --radius-full: 9999px;
+
+  /* ── Semantic Aliases ────────────────────────────────── */
+  --radius-button:  8px;   /* all button types        */
+  --radius-input:   8px;   /* text inputs, selects    */
+  --radius-card:    12px;  /* white surface cards     */
+  --radius-badge:   9999px;/* pill-shaped badges      */
+  --radius-logo:    10px;  /* sidebar logo icon       */
+  --radius-modal:   16px;  /* dialogs and drawers     */
+  --radius-dday:    8px;   /* D-day icon container    */
+}
