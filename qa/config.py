@@ -31,6 +31,9 @@ class Settings(BaseSettings):
     # n8n(컨테이너)이 산출물(스크린샷)을 내려받을 때 쓰는 이 API의 주소
     api_url_for_n8n: str = "http://host.docker.internal:8090"
 
+    # 근거 문서 검색 방식 (vector | keyword | agentic) — 측정 결과로 정한다
+    rag_method: str = "vector"
+
     # Claude Code 헤드리스 호출용 구독 토큰 (`claude setup-token`)
     claude_code_oauth_token: str | None = Field(default=None, validation_alias="CLAUDE_CODE_OAUTH_TOKEN")
 

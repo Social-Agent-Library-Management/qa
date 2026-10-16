@@ -65,7 +65,7 @@ def main() -> None:
     elif args.cmd == "explore":
         from qa import explore as explore_mod
         summary = explore_mod.run(args.request, args.front_ref, args.back_ref)
-        print(json.dumps({k: summary[k] for k in ("verdict", "explanation", "steps", "screenshots")},
+        print(json.dumps({k: summary[k] for k in ("verdict", "explanation", "retrieved", "references", "screenshots")},
                          ensure_ascii=False, indent=2))
         print(f"\n{summary['verdict'].upper()} — artifacts/{summary['run_id']}/")
     elif args.cmd == "stack":

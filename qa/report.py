@@ -58,7 +58,15 @@ def _explore_report(summary: dict) -> tuple[str, list[dict]]:
     v = summary["verdict"]
     lines = [f"{ICON[v]} *{LABEL[v]}* · AI 탐색 테스트 · {_duration(summary)}",
              f"대상: {_target(summary)}", "",
-             f"*판정 근거* {summary['explanation']}", "", "*확인한 화면*"]
+             f"*판정 근거* {summary['explanation']}", ""]
+    refs = summary.get("references") or []
+    if refs:
+        lines.append("*📘 근거 문서* (vault)")
+        for ref in refs:
+            mark = "" if ref.get("verified") else " ⚠️ 인용문 확인 안 됨"
+            lines.append(f"• `{ref['path']}`{mark}\n> {ref['quote']}")
+        lines.append("")
+    lines.append("*확인한 화면*")
     attachments = []
     for i, step in enumerate(summary["steps"], 1):
         mark = " 📸" if step.get("screenshot") and not step.get("screenshot_missing") else ""

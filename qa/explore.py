@@ -5,6 +5,7 @@
 """
 
 import json
+import re
 from datetime import datetime
 from pathlib import Path
 
@@ -12,6 +13,7 @@ import yaml
 
 from qa.config import settings
 from qa.intent import claude
+from qa.rag import context
 from qa.seed import reset
 from qa.stack import apps
 
@@ -23,6 +25,13 @@ SYSTEM = """너는 도서관 관리 시스템의 QA 테스터다. 사람이 하�
 - 프론트엔드: {base_url} (관리자 화면, 로그인 없음)
 - 데이터는 방금 아래 시드 상태로 초기화되었다. 자유롭게 등록·대출·반납해도 된다.
 {seed}
+
+판정 근거 문서 (vault의 기획서·과거 이력에서 요청과 관련된 것을 찾아 붙였다):
+{references}
+
+기대 동작은 위 문서에서 찾는다. 기획서와 이력이 다르면 더 최근에 구현된 이력을 우선한다.
+판정에 쓴 문서는 references에 경로와 근거 문장을 그대로 인용해 남긴다.
+문서에 기대 동작이 없으면 상식으로 추측하지 말고, 그 사실을 summary에 밝힌다.
 
 진행 규칙:
 - 브라우저 도구만 사용한다. URL을 직접 추측하기보다 화면의 메뉴와 링크를 따라간다.
@@ -54,10 +63,28 @@ SCHEMA = {
                 "additionalProperties": False,
             },
         },
+        "references": {
+            "type": "array",
+            "description": "판정에 사용한 근거 문서",
+            "items": {
+                "type": "object",
+                "properties": {
+                    "path": {"type": "string", "description": "근거 문서 목록에 있는 경로 그대로"},
+                    "quote": {"type": "string", "description": "문서에서 그대로 옮긴 근거 문장"},
+                },
+                "required": ["path", "quote"],
+                "additionalProperties": False,
+            },
+        },
     },
-    "required": ["verdict", "summary", "steps"],
+    "required": ["verdict", "summary", "steps", "references"],
     "additionalProperties": False,
 }
+
+
+def _normalize(text: str) -> str:
+    # 마크다운 기호·공백 차이로 정상 인용이 불일치 처리되지 않도록 비교용으로만 정규화한다.
+    return re.sub(r"[\s*`>|#_\-]+", "", text)
 
 
 def _seed_description(data: dict) -> str:
@@ -82,7 +109,9 @@ def run(request: str, front_ref: str = "HEAD", back_ref: str = "HEAD", job_id: s
                  "--viewport-size", "1440,900", "--output-dir", str(shots)],
     }}}))
 
-    system = SYSTEM.format(base_url=settings.frontend_url, seed=_seed_description(seed))
+    hits = context.retrieve(request)
+    system = SYSTEM.format(base_url=settings.frontend_url, seed=_seed_description(seed),
+                           references=context.for_prompt(hits))
     error = None
     try:
         result = claude.structured(
@@ -93,7 +122,13 @@ def run(request: str, front_ref: str = "HEAD", back_ref: str = "HEAD", job_id: s
             cwd=shots,
         )
     except claude.ClaudeError as e:
-        result, error = {"verdict": "inconclusive", "summary": str(e), "steps": []}, str(e)
+        result, error = {"verdict": "inconclusive", "summary": str(e), "steps": [], "references": []}, str(e)
+
+    # 근거 검증: 제공하지 않은 문서를 인용했거나 인용문이 그 문서에 없으면 지어낸 근거로 본다.
+    provided = {h.path: h.text for h in hits}
+    for ref in result["references"]:
+        source = provided.get(ref["path"])
+        ref["verified"] = bool(source) and _normalize(ref["quote"]) in _normalize(source)
 
     # 증거 검증: 언급한 스크린샷이 실제로 없으면 그 판정은 믿을 수 없다.
     existing = {p.name for p in shots.rglob("*.png")}
@@ -117,6 +152,8 @@ def run(request: str, front_ref: str = "HEAD", back_ref: str = "HEAD", job_id: s
         "verdict": result["verdict"],
         "explanation": result["summary"],
         "steps": result["steps"],
+        "references": result["references"],
+        "retrieved": [h.path for h in hits],
         "screenshots": sorted(str(p.relative_to(run_dir)) for p in shots.rglob("*.png")),
         "error": error,
     }
