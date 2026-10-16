@@ -22,6 +22,20 @@ services:
       timeout: 3s
       retries: 40
 
+  # 작업 큐. 작업 이력(접수·시작·종료 시각)이 지표의 원천이라 tmpfs가 아닌 볼륨에 둔다.
+  redis:
+    image: redis:8
+    ports:
+      - "6380:6379"
+    command: ["redis-server", "--appendonly", "yes"]
+    volumes:
+      - redis-data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 3s
+      timeout: 3s
+      retries: 20
+
   opensearch:
     build:
       context: ${QA_BACKEND_DIR}/docker/opensearch
@@ -41,3 +55,6 @@ services:
       interval: 5s
       timeout: 5s
       retries: 40
+
+volumes:
+  redis-data:
