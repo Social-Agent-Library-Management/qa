@@ -22,6 +22,11 @@ def main() -> None:
     run.add_argument("--front-ref", default="HEAD")
     run.add_argument("--back-ref", default="HEAD")
 
+    explore = sub.add_parser("explore", help="AI 탐색 테스트 (자연어 요청을 브라우저로 직접 검증)")
+    explore.add_argument("request")
+    explore.add_argument("--front-ref", default="HEAD")
+    explore.add_argument("--back-ref", default="HEAD")
+
     sub.add_parser("api", help="작업 접수 API 서버")
     sub.add_parser("worker", help="작업 실행 워커 (하나만 띄운다)")
 
@@ -41,6 +46,12 @@ def main() -> None:
         # fork 없이 같은 프로세스에서 실행한다 — macOS의 fork 안전성 문제를 피하고,
         # 실제 무거운 일(빌드·브라우저)은 어차피 하위 프로세스가 한다.
         SimpleWorker([queue()], connection=redis()).work()
+    elif args.cmd == "explore":
+        from qa import explore as explore_mod
+        summary = explore_mod.run(args.request, args.front_ref, args.back_ref)
+        print(json.dumps({k: summary[k] for k in ("verdict", "explanation", "steps", "screenshots")},
+                         ensure_ascii=False, indent=2))
+        print(f"\n{summary['verdict'].upper()} — artifacts/{summary['run_id']}/")
     elif args.cmd == "stack":
         if args.action == "up":
             print(json.dumps(apps.up(args.front_ref, args.back_ref), indent=2))
