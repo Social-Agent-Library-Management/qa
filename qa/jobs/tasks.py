@@ -8,6 +8,7 @@ from rq import get_current_job
 from qa import analyze, explore, report, runner
 from qa.config import settings
 from qa.jobs.queue import ENV_LOCK, JOB_TIMEOUT, redis
+from qa.rag import journal
 
 log = logging.getLogger(__name__)
 
@@ -43,5 +44,11 @@ def run_job(request: dict, front_sha: str, back_sha: str, mode: str = "scenario"
         if analyze.needed(summary):
             summary["analysis"] = analyze.run(summary)
 
-    _callback({**payload, "summary": summary, "report": report.build(summary)})
+    built = report.build(summary)
+    _callback({**payload, "summary": summary, "report": built})
+    # 회신이 먼저다 — 리포트 기록·재인덱싱(임베딩)은 요청자를 기다리게 하지 않는다.
+    try:
+        summary["journal"] = str(journal.write(summary, built["text"], request))
+    except Exception:
+        log.exception("QA 리포트 기록 실패: job=%s", job.id)
     return summary
