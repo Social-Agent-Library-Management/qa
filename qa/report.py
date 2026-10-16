@@ -76,8 +76,27 @@ def _explore_report(summary: dict) -> tuple[str, list[dict]]:
     return "\n".join(lines), attachments
 
 
+def _analysis_section(a: dict) -> str:
+    if "error" in a:
+        return f"\n*🔎 실패 분석* 실행하지 못했습니다\n> {a['error'][:300]}"
+    from qa.analyze import CATEGORIES
+    lines = ["", f"*🔎 실패 분석* `{a['category']}` ({CATEGORIES[a['category']].split(' (')[0]}) · 확신도 {a['confidence']}",
+             f"> {a['cause']}"]
+    if a["fix_candidates"]:
+        lines.append("*🔧 수정 후보*")
+        for c in a["fix_candidates"]:
+            mark = "" if c.get("verified") else " ⚠️ 위치 확인 안 됨"
+            lines.append(f"• {c['repo']} `{c['file']}:{c['line']}`{mark} — {c['reason']}")
+    if a["similar_history"]:
+        lines.append("*🕘 비슷한 과거 사례*")
+        lines += [f"• `{h['path']}` — {h['why']}" for h in a["similar_history"]]
+    return "\n".join(lines)
+
+
 def build(summary: dict) -> dict:
     text, attachments = (_explore_report if summary.get("mode") == "explore" else _scenario_report)(summary)
+    if summary.get("analysis"):
+        text += "\n" + _analysis_section(summary["analysis"])
     return {"text": text, "attachments": attachments}
 
 

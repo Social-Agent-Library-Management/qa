@@ -5,7 +5,7 @@ import logging
 import httpx
 from rq import get_current_job
 
-from qa import explore, report, runner
+from qa import analyze, explore, report, runner
 from qa.config import settings
 from qa.jobs.queue import ENV_LOCK, JOB_TIMEOUT, redis
 
@@ -39,6 +39,9 @@ def run_job(request: dict, front_sha: str, back_sha: str, mode: str = "scenario"
             # 빌드 실패·기동 실패는 시나리오 실패와 구분해 알린다.
             _callback({**payload, "error": f"{type(e).__name__}: {e}", "report": report.build_error(str(e))})
             raise
+        # 분석은 테스트 환경을 쓰지 않지만(코드·로그만 읽음) 결과를 한 번에 보내기 위해 락 안에서 끝낸다.
+        if analyze.needed(summary):
+            summary["analysis"] = analyze.run(summary)
 
     _callback({**payload, "summary": summary, "report": report.build(summary)})
     return summary

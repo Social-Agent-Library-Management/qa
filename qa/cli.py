@@ -34,6 +34,9 @@ def main() -> None:
     rag.add_argument("--source", choices=["기획서", "이력", "QA 리포트"])
     rag.add_argument("-k", type=int, default=5)
 
+    analyze_p = sub.add_parser("analyze", help="실패한 실행 결과를 분석 (원인 분류·수정 위치)")
+    analyze_p.add_argument("run_id")
+
     sub.add_parser("api", help="작업 접수 API 서버")
     sub.add_parser("worker", help="작업 실행 워커 (하나만 띄운다)")
 
@@ -53,6 +56,12 @@ def main() -> None:
         # fork 없이 같은 프로세스에서 실행한다 — macOS의 fork 안전성 문제를 피하고,
         # 실제 무거운 일(빌드·브라우저)은 어차피 하위 프로세스가 한다.
         SimpleWorker([queue()], connection=redis()).work()
+    elif args.cmd == "analyze":
+        from qa import analyze, report
+        from qa.config import settings
+        summary = json.loads((settings.artifacts_dir / args.run_id / "summary.json").read_text())
+        summary["analysis"] = analyze.run(summary)
+        print(report.build(summary)["text"])
     elif args.cmd == "rag":
         from qa.rag import history, index, search
         if args.action == "history":
