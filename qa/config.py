@@ -26,6 +26,10 @@ class Settings(BaseSettings):
     frontend_port: int = 3001
     api_port: int = 8090
 
+    # 캡처 화면 크기 — 시나리오 테스트와 AI 탐색이 같은 값을 써야 스크린샷끼리(디자인 비교 포함) 맞댈 수 있다.
+    viewport_width: int = 1440
+    viewport_height: int = 900
+
     # 작업 완료 결과를 받을 곳(n8n 출구 웹훅). 비어 있으면 로그만 남긴다.
     callback_url: str | None = None
     # n8n(컨테이너)이 산출물(스크린샷)을 내려받을 때 쓰는 이 API의 주소

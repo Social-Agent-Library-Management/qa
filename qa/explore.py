@@ -106,7 +106,7 @@ def run(request: str, front_ref: str = "HEAD", back_ref: str = "HEAD", job_id: s
     mcp_config.write_text(json.dumps({"mcpServers": {"playwright": {
         "command": "npx",
         "args": ["-y", PLAYWRIGHT_MCP, "--headless", "--isolated", "--browser", "chromium",
-                 "--viewport-size", "1440,900", "--output-dir", str(shots)],
+                 "--viewport-size", f"{settings.viewport_width},{settings.viewport_height}", "--output-dir", str(shots)],
     }}}))
 
     hits = context.retrieve(request)
