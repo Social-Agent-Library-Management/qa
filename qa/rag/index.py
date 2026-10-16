@@ -32,7 +32,7 @@ class Chunk:
     path: str        # vault 기준 상대 경로 — Obsidian 링크로 그대로 쓴다
     title: str
     heading: str
-    source: str      # 기획서 | 이력 | QA 리포트
+    source: str      # 기획서 | 디자인 | 이력 | QA 리포트
     repo: str
     text: str
 

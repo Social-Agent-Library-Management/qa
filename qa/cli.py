@@ -31,7 +31,7 @@ def main() -> None:
     rag.add_argument("action", choices=["history", "sync", "search"])
     rag.add_argument("query", nargs="?")
     rag.add_argument("--method", choices=["vector", "keyword", "agentic"], default="vector")
-    rag.add_argument("--source", choices=["기획서", "이력", "QA 리포트"])
+    rag.add_argument("--source", choices=["기획서", "디자인", "이력", "QA 리포트"])
     rag.add_argument("-k", type=int, default=5)
 
     analyze_p = sub.add_parser("analyze", help="실패한 실행 결과를 분석 (원인 분류·수정 위치)")

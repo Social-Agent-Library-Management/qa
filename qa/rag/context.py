@@ -1,4 +1,4 @@
-"""검증 요청에 붙일 근거 문서(기획서·과거 이력)를 찾아 프롬프트용으로 만든다."""
+"""검증 요청에 붙일 근거 문서(기획서·디자인 스펙·과거 이력)를 찾아 프롬프트용으로 만든다."""
 
 from qa.config import settings
 from qa.rag import search
