@@ -1,0 +1,43 @@
+# QA 전용 인프라. 개발용 library 프로젝트(3306/9200, 바인드 마운트 데이터)와 포트·볼륨을 공유하지 않는다.
+# 데이터는 tmpfs라 컨테이너를 내리면 사라진다 — 매 실행은 seed 리셋으로 시작하므로 영속할 이유가 없다.
+name: library-qa
+
+services:
+  mysql:
+    image: mysql:8.0
+    ports:
+      - "3307:3306"
+    environment:
+      MYSQL_ROOT_PASSWORD: qa
+      MYSQL_DATABASE: library_qa
+      TZ: Asia/Seoul
+    command:
+      - --character-set-server=utf8mb4
+      - --collation-server=utf8mb4_bin
+    tmpfs:
+      - /var/lib/mysql
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "127.0.0.1", "-uroot", "-pqa"]
+      interval: 3s
+      timeout: 3s
+      retries: 40
+
+  opensearch:
+    build:
+      context: ${QA_BACKEND_DIR}/docker/opensearch
+    environment:
+      - discovery.type=single-node
+      - DISABLE_SECURITY_PLUGIN=true
+      - DISABLE_INSTALL_DEMO_CONFIG=true
+      - action.auto_create_index=false
+      - "OPENSEARCH_JAVA_OPTS=-Xms512m -Xmx512m"
+      - TZ=Asia/Seoul
+    ports:
+      - "9201:9200"
+    tmpfs:
+      - /usr/share/opensearch/data:uid=1000,gid=1000
+    healthcheck:
+      test: ["CMD-SHELL", "curl -fs 'http://localhost:9200/_cluster/health?wait_for_status=yellow&timeout=2s' || exit 1"]
+      interval: 5s
+      timeout: 5s
+      retries: 40
