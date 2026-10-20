@@ -1,5 +1,6 @@
 """워커가 실행하는 작업 본체."""
 
+import json
 import logging
 
 import httpx
@@ -51,4 +52,19 @@ def run_job(request: dict, front_sha: str, back_sha: str, mode: str = "scenario"
         summary["journal"] = str(journal.write(summary, built["text"], request))
     except Exception:
         log.exception("QA 리포트 기록 실패: job=%s", job.id)
+
+    _persist(summary, job, request)
     return summary
+
+
+def _persist(summary: dict, job, request: dict) -> None:
+    """지표 집계용으로 요청 정보·대기 시간까지 실행 기록(summary.json)에 남긴다.
+    RQ 결과는 30일 뒤 사라지지만 실행 기록은 산출물 폴더에 남는다."""
+    summary.update({
+        "source": request.get("source"),
+        "request": request.get("request") or summary.get("request"),
+        "enqueued_at": job.enqueued_at.astimezone().isoformat(timespec="seconds") if job.enqueued_at else None,
+        "job_started_at": job.started_at.astimezone().isoformat(timespec="seconds") if job.started_at else None,
+    })
+    path = settings.artifacts_dir / summary["run_id"] / "summary.json"
+    path.write_text(json.dumps(summary, ensure_ascii=False, indent=2))

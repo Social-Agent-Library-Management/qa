@@ -76,6 +76,7 @@ def run(names: list[str], front_ref: str = "HEAD", back_ref: str = "HEAD", job_i
     summary = {
         "run_id": run_id,
         "job_id": job_id,
+        "mode": "scenario",
         "scenarios": names or ["all"],
         **shas,
         "started_at": started,

@@ -6,6 +6,7 @@
 """
 
 import json
+import time
 from pathlib import Path
 
 from qa.config import settings
@@ -121,6 +122,7 @@ def run(summary: dict, timeout: float = 600) -> dict:
     prompt = (f"검증 요청: {summary.get('request') or ', '.join(summary.get('scenarios', []))}\n\n"
               f"# 실패 증거\n{evidence}\n\n# 근거 문서 (검색 결과)\n{context.for_prompt(hits)}")
     dirs = [str(front), str(back), str(run_dir), str(context.search.index.VAULT), str(SCENARIO_DIR)]
+    started = time.monotonic()
     try:
         result = claude.structured(
             prompt, SCHEMA, system, tools="Read,Grep,Glob", effort="medium", timeout=timeout,
@@ -130,6 +132,7 @@ def run(summary: dict, timeout: float = 600) -> dict:
         return {"error": str(e)}
     _verify(result["fix_candidates"], front, back)
     result["retrieved"] = [h.path for h in hits]
+    result["duration_s"] = round(time.monotonic() - started, 1)
     (run_dir / "analysis.json").write_text(json.dumps(result, ensure_ascii=False, indent=2))
     return result
 
