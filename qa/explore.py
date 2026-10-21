@@ -14,7 +14,7 @@ import yaml
 from qa import video
 from qa.config import settings
 from qa.intent import claude
-from qa.rag import context
+from qa.rag import context, design
 from qa.seed import reset
 from qa.stack import apps
 
@@ -35,6 +35,8 @@ SYSTEM = """너는 도서관 관리 시스템의 QA 테스터다. 사람이 하�
 기대 동작은 위 문서에서 찾는다. 기획서와 이력이 다르면 더 최근에 구현된 이력을 우선한다.
 판정에 쓴 문서는 references에 경로와 근거 문장을 그대로 인용해 남긴다.
 문서에 기대 동작이 없으면 상식으로 추측하지 말고, 그 사실을 summary에 밝힌다.
+디자인 시안 이미지가 붙은 문서는 Read로 이미지를 열어 같은 화면의 구현 캡처와 배치·구성·스타일을 비교한다.
+시안의 목업 데이터(도서명·이름·숫자)는 시드와 다르므로 값 차이는 결함이 아니다.
 
 진행 규칙:
 - 브라우저 도구만 사용한다. URL을 직접 추측하기보다 화면의 메뉴와 링크를 따라간다.
@@ -126,8 +128,10 @@ def run(request: str, front_ref: str = "HEAD", back_ref: str = "HEAD", job_id: s
     try:
         result = claude.structured(
             f"검증 요청: {request}", SCHEMA, system,
-            tools="", effort="medium", timeout=timeout,
-            extra_args=["--mcp-config", str(mcp_config), "--allowedTools", "mcp__playwright__*"],
+            # Read는 디자인 시안 이미지를 보기 위해서만 연다 (시안 폴더만 접근 허용).
+            tools="Read", effort="medium", timeout=timeout,
+            extra_args=["--mcp-config", str(mcp_config), "--allowedTools", "mcp__playwright__*", "Read",
+                        "--add-dir", str(design.OUT_DIR)],
             # 파일명을 지정한 스크린샷은 --output-dir가 아니라 MCP 프로세스의 작업 폴더에 저장된다.
             cwd=shots,
         )

@@ -27,8 +27,8 @@ def main() -> None:
     explore.add_argument("--front-ref", default="HEAD")
     explore.add_argument("--back-ref", default="HEAD")
 
-    rag = sub.add_parser("rag", help="vault 이력 수집·인덱스 동기화·검색")
-    rag.add_argument("action", choices=["history", "sync", "search"])
+    rag = sub.add_parser("rag", help="vault 이력 수집·디자인 시안 생성·인덱스 동기화·검색")
+    rag.add_argument("action", choices=["history", "design", "sync", "search"])
     rag.add_argument("query", nargs="?")
     rag.add_argument("--method", choices=["vector", "keyword", "agentic"], default="vector")
     rag.add_argument("--source", choices=["기획서", "디자인", "이력", "QA 리포트"])
@@ -71,6 +71,9 @@ def main() -> None:
         from qa.rag import history, index, search
         if args.action == "history":
             print(history.collect())
+        elif args.action == "design":
+            from qa.rag import design
+            print("\n".join(str(p.relative_to(design.VAULT)) for p in design.render()))
         elif args.action == "sync":
             print(index.sync())
         else:
