@@ -11,6 +11,7 @@ from pathlib import Path
 
 import yaml
 
+from qa import video
 from qa.config import settings
 from qa.intent import claude
 from qa.rag import context
@@ -18,6 +19,8 @@ from qa.seed import reset
 from qa.stack import apps
 
 PLAYWRIGHT_MCP = "@playwright/mcp@0.0.83"
+# AI가 생각하는 동안 화면이 멈춰 있어 영상이 길다 — 보내는 영상은 배속을 올린다.
+VIDEO_SPEED = 1.5
 
 SYSTEM = """너는 도서관 관리 시스템의 QA 테스터다. 사람이 하듯이 브라우저로 화면을 직접 조작해 요청을 검증한다.
 
@@ -102,11 +105,18 @@ def run(request: str, front_ref: str = "HEAD", back_ref: str = "HEAD", job_id: s
     shas = apps.up(front_ref=front_ref, back_ref=back_ref)
     seed = reset.reset()
 
+    # 녹화는 CLI 플래그가 없어 브라우저 컨텍스트 옵션으로 켠다. AI가 녹화 도구를 부를 필요 없이 세션 전체가 남는다.
+    videos = run_dir / "video"
+    browser_config = run_dir / "browser.json"
+    browser_config.write_text(json.dumps({"browser": {"contextOptions": {"recordVideo": {
+        "dir": str(videos), "size": {"width": settings.viewport_width, "height": settings.viewport_height},
+    }}}}))
     mcp_config = run_dir / "mcp.json"
     mcp_config.write_text(json.dumps({"mcpServers": {"playwright": {
         "command": "npx",
         "args": ["-y", PLAYWRIGHT_MCP, "--headless", "--isolated", "--browser", "chromium",
-                 "--viewport-size", f"{settings.viewport_width},{settings.viewport_height}", "--output-dir", str(shots)],
+                 "--viewport-size", f"{settings.viewport_width},{settings.viewport_height}", "--output-dir", str(shots),
+                 "--config", str(browser_config)],
     }}}))
 
     hits = context.retrieve(request)
@@ -139,6 +149,12 @@ def run(request: str, front_ref: str = "HEAD", back_ref: str = "HEAD", job_id: s
     if result["verdict"] != "inconclusive" and not cited:
         result["summary"] = f"[증거 없음 → 판단 불가로 강등] {result['summary']}"
         result["verdict"] = "inconclusive"
+    finished = datetime.now().isoformat(timespec="seconds")
+
+    # 탭을 새로 열면 영상이 여러 개 생긴다 — 각각 변환해 모두 남긴다.
+    # 녹화 파일명(page@<해시>)은 Slack에서 알아보기 어려워 순번 이름으로 바꾼다.
+    converted = [video.to_mp4(w, videos / f"ai-explore{f'-{i}' if i else ''}.mp4", speed=VIDEO_SPEED)
+                 for i, w in enumerate(sorted(videos.glob("*.webm"), key=lambda p: p.stat().st_mtime))]
 
     summary = {
         "run_id": run_id,
@@ -147,7 +163,7 @@ def run(request: str, front_ref: str = "HEAD", back_ref: str = "HEAD", job_id: s
         "request": request,
         **shas,
         "started_at": started,
-        "finished_at": datetime.now().isoformat(timespec="seconds"),
+        "finished_at": finished,
         "passed": result["verdict"] == "pass",
         "verdict": result["verdict"],
         "explanation": result["summary"],
@@ -155,6 +171,7 @@ def run(request: str, front_ref: str = "HEAD", back_ref: str = "HEAD", job_id: s
         "references": result["references"],
         "retrieved": [h.path for h in hits],
         "screenshots": sorted(str(p.relative_to(run_dir)) for p in shots.rglob("*.png")),
+        "videos": [str(p.relative_to(run_dir)) for p in converted if p],
         "error": error,
     }
     (run_dir / "summary.json").write_text(json.dumps(summary, ensure_ascii=False, indent=2))

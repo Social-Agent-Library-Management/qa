@@ -8,6 +8,7 @@ import xml.etree.ElementTree as ET
 from datetime import datetime
 from pathlib import Path
 
+from qa import video
 from qa.config import ROOT, settings
 from qa.stack import apps
 
@@ -64,6 +65,8 @@ def run(names: list[str], front_ref: str = "HEAD", back_ref: str = "HEAD", job_i
         "--tracing", "retain-on-failure",
         # 통과도 근거가 남도록 테스트마다 마지막 화면을 캡처한다 (실패 시 trace는 따로 남김).
         "--screenshot", "on",
+        # 통과·실패 모두 사람이 흐름을 볼 수 있게 녹화한다 (Slack에는 mp4로 변환해 첨부).
+        "--video", "on",
         "--output", str(run_dir / "playwright"),
         "--junitxml", str(junit),
         "-p", "no:cacheprovider",
@@ -73,6 +76,10 @@ def run(names: list[str], front_ref: str = "HEAD", back_ref: str = "HEAD", job_i
                        stdout=log, stderr=subprocess.STDOUT)
 
     tests = _parse_junit(junit, run_dir) if junit.exists() else []
+    for t in tests:
+        webm = next((run_dir / a for a in t["artifacts"] if a.endswith(".webm")), None)
+        mp4 = webm and video.to_mp4(webm, webm.with_suffix(".mp4"))
+        t["video"] = str(mp4.relative_to(run_dir)) if mp4 else None
     summary = {
         "run_id": run_id,
         "job_id": job_id,

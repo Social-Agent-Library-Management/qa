@@ -51,6 +51,8 @@ def _scenario_report(summary: dict) -> tuple[str, list[dict]]:
             lines.append(f"• ✅ {title}")
         attachments += [_attachment(summary["run_id"], a, f"{'❌' if failed else '✅'} {title} — 마지막 화면")
                         for a in t["artifacts"] if a.endswith(".png")]
+        if t.get("video"):
+            attachments.append(_attachment(summary["run_id"], t["video"], f"🎬 {title} — 테스트 영상"))
     return "\n".join(lines), attachments
 
 
@@ -73,6 +75,9 @@ def _explore_report(summary: dict) -> tuple[str, list[dict]]:
         lines.append(f"{i}. {step['action']} — {step['observation']}{mark}")
         if mark:
             attachments.append(_attachment(summary["run_id"], f"screens/{step['screenshot']}", f"{i}. {step['action']}"))
+    from qa.explore import VIDEO_SPEED
+    attachments += [_attachment(summary["run_id"], v, f"🎬 AI 탐색 영상 ({VIDEO_SPEED:g}배속)")
+                    for v in summary.get("videos") or []]
     return "\n".join(lines), attachments
 
 

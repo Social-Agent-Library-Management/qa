@@ -28,7 +28,9 @@ uv run qa stack down
 ```
 
 결과는 `artifacts/<run_id>/`에 남는다: `summary.json`, `junit.xml`, `network/*.jsonl`(백엔드 요청·응답),
-실패 시 `playwright/**/trace.zip`·스크린샷 (`uv run playwright show-trace <trace.zip>`).
+테스트마다 마지막 화면 스크린샷과 녹화 영상(`video.mp4`, AI 탐색은 `video/*.mp4` 1.5배속),
+실패 시 `playwright/**/trace.zip` (`uv run playwright show-trace <trace.zip>`).
+영상은 Slack 재생용으로 H.264 mp4로 변환한다 — ffmpeg는 `imageio-ffmpeg`에 포함된 바이너리를 쓴다.
 
 ## 작업 API (비동기 실행)
 ```bash

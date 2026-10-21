@@ -15,9 +15,10 @@ expect.set_options(timeout=5_000)
 
 @pytest.fixture(scope="session")
 def browser_context_args(browser_context_args: dict) -> dict:
-    """캡처 크기를 AI 탐색과 맞춘다 (pytest-playwright 기본값은 1280×720)."""
-    return {**browser_context_args,
-            "viewport": {"width": settings.viewport_width, "height": settings.viewport_height}}
+    """캡처 크기를 AI 탐색과 맞춘다 (pytest-playwright 기본값은 1280×720).
+    녹화도 같은 크기로 — 지정하지 않으면 800px 안으로 축소된다."""
+    size = {"width": settings.viewport_width, "height": settings.viewport_height}
+    return {**browser_context_args, "viewport": size, "record_video_size": size}
 
 
 @pytest.fixture(autouse=True)
